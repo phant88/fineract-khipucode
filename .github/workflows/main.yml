@@ -23,7 +23,7 @@ jobs:
         uses: docker/login-action@v2
         with:
           username: khipucode
-          password: dckr_pat_r2HXKhfr5MJOsLwxrT7gSQwhjs4
+          password: ${{ secrets.DOCKER_PASSWORD }}
       
       - name: Valida dockerbuild gradle
         run: ./gradlew :fineract-provider:jibDockerBuild -x tes
