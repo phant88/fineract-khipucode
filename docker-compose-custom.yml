@@ -36,4 +36,4 @@ services:
     env_file:
       - ./config/docker/env/fineract.env
       - ./config/docker/env/fineract-common.env
-      - ./config/docker/env/fineract-mariadb.env
+      - ./config/docker/env/fineract-aurora.env

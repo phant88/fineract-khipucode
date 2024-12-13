@@ -1,0 +1,37 @@
+name: Despliegue con Docker Compose
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Verificar versión de Docker Compose
+        run: docker compose version
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: khipucode
+          password: dckr_pat_r2HXKhfr5MJOsLwxrT7gSQwhjs4
+      
+      - name: Valida dockerbuild gradle
+        run: ./gradlew :fineract-provider:jibDockerBuild -x tes
+      
+      - name: Configura loki
+        run: docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+
+      - name: Construir y publicar imágenes
+        run: |
+          docker compose -f ./docker-compose-custom.yml build
+          docker compose -f ./docker-compose-custom.yml push
