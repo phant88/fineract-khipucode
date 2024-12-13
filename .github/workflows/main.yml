@@ -5,8 +5,11 @@ name: Despliegue con Docker Compose
 #    branches:
 #      - develop
 
+on:
+  workflow_dispatch:
+
 jobs:
-  deploy:
+  fineract-deploy:
     runs-on: ubuntu-latest
 
     steps:
