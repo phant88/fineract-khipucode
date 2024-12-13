@@ -46,4 +46,6 @@ jobs:
 
       - name: Construir y publicar imágenes
         run: docker compose -f ./docker-compose-custom.yml build
-        #  docker compose -f ./docker-compose-custom.yml push
+
+      - name: Publicar imágenes
+        run: docker compose -f ./docker-compose-custom.yml push        
