@@ -16,6 +16,18 @@ jobs:
       - name: Configurar Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@b36c23c0d998641eff861008f374ee103c25ac73 # v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@d156388eb19639ec20ade50009f3d199ce1e2808 # v4.1.0  
+
+      - name: Build the image
+        run: ./gradlew --no-daemon --console=plain :fineract-provider:clean :fineract-provider:build :fineract-provider:jibDockerBuild -x test -x cucumber
+
       - name: Verificar versión de Docker Compose
         run: docker compose version
 
@@ -25,8 +37,8 @@ jobs:
           username: khipucode
           password: ${{ secrets.DOCKER_PASSWORD }}
       
-      - name: Valida dockerbuild gradle
-        run: ./gradlew :fineract-provider:jibDockerBuild -x tes
+      #- name: Valida dockerbuild gradle
+      #  run: ./gradlew :fineract-provider:jibDockerBuild -x tes
       
       - name: Configura loki
         run: docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
