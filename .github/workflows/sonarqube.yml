@@ -1,8 +1,11 @@
 name: Fineract Sonarqube
+#on:
+#  push:
+#    branches:
+#      - develop
+
 on:
-  push:
-    branches:
-      - develop
+  workflow_dispatch:
 
 permissions:
   contents: read

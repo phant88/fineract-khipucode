@@ -1,6 +1,8 @@
 name: Fineract ActiveMQ Smoke
 
-on: [push, pull_request]
+#on: [push, pull_request]
+on:
+  workflow_dispatch:
 
 permissions:
   contents: read
