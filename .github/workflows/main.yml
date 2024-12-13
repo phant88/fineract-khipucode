@@ -1,9 +1,9 @@
 name: Despliegue con Docker Compose
 
-on:
-  push:
-    branches:
-      - develop
+#on:
+#  push:
+#    branches:
+#      - develop
 
 jobs:
   deploy:
