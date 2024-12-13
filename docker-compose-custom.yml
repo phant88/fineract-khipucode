@@ -25,8 +25,9 @@ services:
   #    service: mariadb
 
   fineract:
-    include:
-      - ./config/docker/compose/fineract-custom.yml      
+    extends:
+      file: ./config/docker/compose/fineract.yml
+      service: fineract
     
     ports:
       - "8443:8443"
