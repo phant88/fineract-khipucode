@@ -45,6 +45,5 @@ jobs:
         run: docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
 
       - name: Construir y publicar imágenes
-        run: |
-          docker compose -f ./docker-compose-custom.yml build
-          docker compose -f ./docker-compose-custom.yml push
+        run: docker compose -f ./docker-compose-custom.yml build
+        #  docker compose -f ./docker-compose-custom.yml push
