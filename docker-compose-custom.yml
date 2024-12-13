@@ -17,7 +17,7 @@
 #
 
 # You can replace and test a more recent version of docker compose
-version: "3.8"
+#version: "3.8"
 services:
   #db:
   #  extends:
@@ -25,14 +25,12 @@ services:
   #    service: mariadb
 
   fineract:
-    extends:
-      file: ./config/docker/compose/fineract-custom.yml
-      service: fineract
+    include:
+      - ./config/docker/compose/fineract-custom.yml      
+    
     ports:
       - "8443:8443"
-    #depends_on:
-    #  db:
-    #    condition: service_healthy
+    
     env_file:
       - ./config/docker/env/fineract.env
       - ./config/docker/env/fineract-common.env
