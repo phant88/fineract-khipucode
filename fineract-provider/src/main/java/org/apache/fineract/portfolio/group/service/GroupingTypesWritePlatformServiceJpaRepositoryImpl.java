@@ -82,6 +82,7 @@ import org.apache.fineract.portfolio.group.exception.InvalidGroupStateTransition
 import org.apache.fineract.portfolio.group.serialization.GroupingTypesDataValidator;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
+import org.apache.fineract.portfolio.loanaccount.service.LoanOfficerService;
 import org.apache.fineract.portfolio.note.domain.Note;
 import org.apache.fineract.portfolio.note.domain.NoteRepository;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccount;
@@ -115,6 +116,7 @@ public class GroupingTypesWritePlatformServiceJpaRepositoryImpl implements Group
     private final AccountNumberGenerator accountNumberGenerator;
     private final EntityDatatableChecksWritePlatformService entityDatatableChecksWritePlatformService;
     private final BusinessEventNotifierService businessEventNotifierService;
+    private final LoanOfficerService loanOfficerService;
 
     private CommandProcessingResult createGroupingType(final JsonCommand command, final GroupTypes groupingType, final Long centerId) {
         try {
@@ -517,7 +519,7 @@ public class GroupingTypesWritePlatformServiceJpaRepositoryImpl implements Group
                     if (this.loanRepositoryWrapper.doNonClosedLoanAccountsExistForClient(client.getId())) {
                         for (final Loan loan : this.loanRepositoryWrapper.findLoanByClientId(client.getId())) {
                             if (loan.isDisbursed() && !loan.isClosed()) {
-                                loan.reassignLoanOfficer(staff, loanOfficerReassignmentDate);
+                                loanOfficerService.reassignLoanOfficer(loan, staff, loanOfficerReassignmentDate);
                             }
                         }
                     }

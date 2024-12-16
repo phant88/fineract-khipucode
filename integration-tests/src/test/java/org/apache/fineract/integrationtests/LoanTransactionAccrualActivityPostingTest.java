@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.integrationtests;
 
+import static org.apache.fineract.integrationtests.common.funds.FundsResourceHandler.createFund;
 import static org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder.ADVANCED_PAYMENT_ALLOCATION_STRATEGY;
 import static org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder.DEFAULT_STRATEGY;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,23 +56,22 @@ import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.SchedulerJobHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.charges.ChargesHelper;
-import org.apache.fineract.integrationtests.common.loans.LoanTestLifecycleExtension;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
+import org.apache.fineract.integrationtests.common.products.DelinquencyBucketsHelper;
 import org.apache.fineract.integrationtests.inlinecob.InlineLoanCOBHelper;
 import org.apache.fineract.portfolio.charge.domain.ChargeCalculationType;
 import org.apache.fineract.portfolio.charge.domain.ChargePaymentMode;
 import org.apache.fineract.portfolio.charge.domain.ChargeTimeType;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType;
 import org.apache.fineract.portfolio.loanproduct.domain.PaymentAllocationType;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@ExtendWith(LoanTestLifecycleExtension.class)
 public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(LoanTransactionAccrualActivityPostingTest.class);
@@ -571,7 +571,6 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
                     transaction(1070.0, "Repayment", repaymentDate1, 0.0, 1000.0, 0.0, 40.0, 30, 0.0, 0.0, true), //
                     transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(70.0, "Accrual Activity", repaymentPeriod1DueDate, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false)); //
-
         });
     }
 
@@ -653,33 +652,36 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
 
             addRepaymentForLoan(loanId.get(), 650.0, repaymentDate1);
 
-            verifyTransactions(loanId.get(), transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
+            verifyTransactions(loanId.get(),
+                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false), //
+                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
                     transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
-                    transaction(70.0, "Accrual Activity", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
-                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false)); //
-
+                    transaction(70.0, "Accrual Activity", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false) //
+            );
         });
         runAt(disbursementDay2, () -> {
 
             loanTransactionHelper.disburseLoan(loanId.get(), new PostLoansLoanIdRequest().actualDisbursementDate(disbursementDay2)
                     .dateFormat(DATETIME_PATTERN).transactionAmount(BigDecimal.valueOf(500.0)).locale("en"));
 
-            verifyTransactions(loanId.get(), transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
+            verifyTransactions(loanId.get(),
+                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false), //
+                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
                     transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
-                    transaction(500.0, "Disbursement", disbursementDay2, 420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 80.0, false), //
-                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false)); //
-
+                    transaction(500.0, "Disbursement", disbursementDay2, 420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 80.0, false) //
+            );
         });
         runAt(repaymentPeriod1CloseDate, () -> {
 
             inlineLoanCOBHelper.executeInlineCOB(List.of(loanId.get()));
 
-            verifyTransactions(loanId.get(), transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
+            verifyTransactions(loanId.get(),
+                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false), //
+                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
                     transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(500.0, "Disbursement", disbursementDay2, 420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 80.0, false), //
-                    transaction(70.0, "Accrual Activity", repaymentPeriod1DueDate, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
-                    transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false)); //
-
+                    transaction(70.0, "Accrual Activity", repaymentPeriod1DueDate, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false) //
+            );
         });
     }
 
@@ -728,8 +730,8 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
                     .dateFormat(DATETIME_PATTERN).transactionAmount(BigDecimal.valueOf(500.0)).locale("en"));
 
             verifyTransactions(loanId.get(), transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 0.0, 40.0, 30.0, 0.0, 80.0, false), //
-                    transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(500.0, "Disbursement", disbursementDay2, 420.0, 0.0, 0.0, 0.0, 0.0, 0.0, 80.0, false), //
+                    transaction(70.0, "Accrual", repaymentDate1, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(70.0, "Accrual Activity", repaymentPeriod1DueDate, 0.0, 0.0, 0.0, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(500.0, "Disbursement", disbursementDay, 500.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false)); //
 
@@ -793,6 +795,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
         final String disbursementDay2 = "02 February 2023";
         final String repaymentDate1 = "15 January 2023";
         final String repaymentPeriod1DueDate = "01 February 2023";
+        final String repaymentPeriod2DueDate = "01 March 2023";
         final String repaymentPeriod1CloseDate = "02 February 2023";
         final String repaymentPeriod2CloseDate = "02 March 2023";
         final String creationBusinessDay = "15 January 2023";
@@ -839,8 +842,8 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
             inlineLoanCOBHelper.executeInlineCOB(List.of(loanId.get()));
 
             verifyTransactions(loanId.get(), transaction(500.0, "Disbursement", disbursementDay, 500.0, 0, 0, 0, 0, 0, 0, false),
-                    transaction(70.0, "Accrual", repaymentDate1, 0, 0, 0.0, 40.0, 30.0, 0, 0, false),
                     transaction(570.0, "Repayment", repaymentDate1, 0.0, 500.0, 0, 40.0, 30.0, 0, 0, false),
+                    transaction(70.0, "Accrual", repaymentDate1, 0, 0, 0.0, 40.0, 30.0, 0, 0, false),
                     transaction(70.0, "Accrual Activity", repaymentPeriod1DueDate, 0, 0, 0.0, 40.0, 30.0, 0, 0, false),
                     transaction(500.0, "Disbursement", disbursementDay2, 500.0, 0, 0, 0, 0, 0, 0, false));
         });
@@ -870,18 +873,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
             chargeFee(loanId.get(), 40.0, repaymentPeriod1DueDate);
             addRepaymentForLoan(loanId.get(), 650.0, repaymentDate1);
             verifyTransactions(loanId.get(),
-                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 39.45, 40.0, 30.0, 0.0, 40.55, false), // transaction(109.45,
-                                                                                                                       // "Accrual",
-                                                                                                                       // repaymentDate1,
-                                                                                                                       // 0.0,
-                                                                                                                       // 0,
-                                                                                                                       // 39.45,
-                                                                                                                       // 40.0,
-                                                                                                                       // 30.0,
-                                                                                                                       // 0,
-                                                                                                                       // 0,
-                                                                                                                       // false),
-                                                                                                                       // //
+                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 39.45, 40.0, 30.0, 0.0, 40.55, false), //
                     transaction(109.45, "Accrual Activity", repaymentDate1, 0.0, 0.0, 39.45, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(109.45, "Accrual", repaymentDate1, 0.0, 0.0, 39.45, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(500.0, "Disbursement", disbursementDay, 500.0, 0, 0, 0, 0, 0, 0, false) //
@@ -890,18 +882,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
         runAt(repaymentPeriod1CloseDate, () -> {
             inlineLoanCOBHelper.executeInlineCOB(List.of(loanId.get()));
             verifyTransactions(loanId.get(),
-                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 39.45, 40.0, 30.0, 0.0, 40.55, false), // transaction(109.45,
-                                                                                                                       // "Accrual",
-                                                                                                                       // repaymentDate1,
-                                                                                                                       // 0.0,
-                                                                                                                       // 0,
-                                                                                                                       // 39.45,
-                                                                                                                       // 40.0,
-                                                                                                                       // 30.0,
-                                                                                                                       // 0,
-                                                                                                                       // 0,
-                                                                                                                       // false),
-                                                                                                                       // //
+                    transaction(650.0, "Repayment", repaymentDate1, 0.0, 500.0, 39.45, 40.0, 30.0, 0.0, 40.55, false), //
                     transaction(109.45, "Accrual Activity", repaymentDate1, 0.0, 0.0, 39.45, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(109.45, "Accrual", repaymentDate1, 0.0, 0.0, 39.45, 40.0, 30.0, 0.0, 0.0, false), //
                     transaction(500.0, "Disbursement", disbursementDay, 500.0, 0, 0, 0, 0, 0, 0, false) //
@@ -980,13 +961,20 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
         loanPaymentChannelToFundSourceMappings.fundSourceAccountId(fundSource.getAccountID().longValue());
         loanPaymentChannelToFundSourceMappings.paymentTypeId(1L);
         paymentChannelToFundSourceMappings.add(loanPaymentChannelToFundSourceMappings);
+
+        final Integer fundId = createFund(requestSpec, responseSpec);
+        Assertions.assertNotNull(fundId);
+
+        final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
+        Assertions.assertNotNull(delinquencyBucketId);
+
         return new PostLoanProductsRequest()//
                 .name(name)//
                 .enableAccrualActivityPosting(true)//
                 .shortName(shortName)//
                 .description(
                         "LP1 with 12% DECLINING BALANCE interest, interest period: Daily, Interest recalculation-Daily, Compounding:none")//
-                .fundId(1L)//
+                .fundId(fundId.longValue())//
                 .startDate(null)//
                 .closeDate(null)//
                 .includeInBorrowerCycle(false)//
@@ -1066,7 +1054,7 @@ public class LoanTransactionAccrualActivityPostingTest extends BaseLoanIntegrati
                 .locale("en")//
                 .disallowExpectedDisbursements(false)//
                 .allowApprovedDisbursedAmountsOverApplied(false)//
-                .delinquencyBucketId(1L)//
+                .delinquencyBucketId(delinquencyBucketId.longValue())//
                 .paymentChannelToFundSourceMappings(paymentChannelToFundSourceMappings)//
                 .penaltyToIncomeAccountMappings(penaltyToIncomeAccountMappings)//
                 .feeToIncomeAccountMappings(feeToIncomeAccountMappings)//

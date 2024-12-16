@@ -24,9 +24,11 @@ import static org.apache.fineract.portfolio.loanproduct.domain.AllocationType.IN
 import static org.apache.fineract.portfolio.loanproduct.domain.AllocationType.PENALTY;
 import static org.apache.fineract.portfolio.loanproduct.domain.AllocationType.PRINCIPAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.refEq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -35,6 +37,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -57,12 +60,14 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanChargePaidBy;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCreditAllocationRule;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanPaymentAllocationRule;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRelation;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRelationTypeEnum;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
+import org.apache.fineract.portfolio.loanaccount.loanschedule.data.ProgressiveLoanInterestScheduleModel;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleProcessingType;
 import org.apache.fineract.portfolio.loanproduct.calc.EMICalculator;
 import org.apache.fineract.portfolio.loanproduct.domain.AllocationType;
@@ -90,11 +95,13 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
     private static final MonetaryCurrency MONETARY_CURRENCY = new MonetaryCurrency("USD", 2, 1);
     private static final MockedStatic<MoneyHelper> MONEY_HELPER = mockStatic(MoneyHelper.class);
     private AdvancedPaymentScheduleTransactionProcessor underTest;
-    private final EMICalculator emiCalculator = Mockito.mock(EMICalculator.class);
+    private static final EMICalculator emiCalculator = Mockito.mock(EMICalculator.class);
+    private static final LoanRepositoryWrapper loanRepositoryWrapper = Mockito.mock(LoanRepositoryWrapper.class);
 
     @BeforeAll
     public static void init() {
         MONEY_HELPER.when(MoneyHelper::getRoundingMode).thenReturn(RoundingMode.HALF_EVEN);
+        MONEY_HELPER.when(MoneyHelper::getMathContext).thenReturn(new MathContext(12, RoundingMode.HALF_EVEN));
     }
 
     @AfterAll
@@ -104,7 +111,7 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
 
     @BeforeEach
     public void setUp() {
-        underTest = new AdvancedPaymentScheduleTransactionProcessor(emiCalculator);
+        underTest = new AdvancedPaymentScheduleTransactionProcessor(emiCalculator, loanRepositoryWrapper, null);
 
         ThreadLocalContextUtil.setTenant(new FineractPlatformTenant(1L, "default", "Default", "Asia/Kolkata", null));
         ThreadLocalContextUtil.setActionContext(ActionContext.DEFAULT);
@@ -142,7 +149,7 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         when(charge.getAmountOutstanding(currency)).thenReturn(chargeAmountMoney);
         when(loanTransaction.getLoan()).thenReturn(loan);
         when(loan.getDisbursementDate()).thenReturn(disbursementDate);
-        when(charge.isDueForCollectionFromIncludingAndUpToAndIncluding(disbursementDate, installment.getDueDate())).thenReturn(true);
+        when(charge.isDueInPeriod(disbursementDate, installment.getDueDate(), true)).thenReturn(true);
         when(installment.getInstallmentNumber()).thenReturn(1);
         when(charge.updatePaidAmountBy(refEq(chargeAmountMoney), eq(1), refEq(zero))).thenReturn(chargeAmountMoney);
         when(loanTransaction.isPenaltyPayment()).thenReturn(false);
@@ -186,7 +193,7 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         when(charge.getAmountOutstanding(currency)).thenReturn(chargeAmountMoney);
         when(loanTransaction.getLoan()).thenReturn(loan);
         when(loan.getDisbursementDate()).thenReturn(disbursementDate);
-        when(charge.isDueForCollectionFromIncludingAndUpToAndIncluding(disbursementDate, installment.getDueDate())).thenReturn(true);
+        when(charge.isDueInPeriod(disbursementDate, installment.getDueDate(), true)).thenReturn(true);
         when(installment.getInstallmentNumber()).thenReturn(1);
         when(charge.updatePaidAmountBy(refEq(transactionAmountMoney), eq(1), refEq(zero))).thenReturn(transactionAmountMoney);
         when(loanTransaction.isPenaltyPayment()).thenReturn(false);
@@ -230,11 +237,11 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         when(loanTransaction.getTransactionDate()).thenReturn(transactionDate);
         when(charge.getAmountOutstanding(currency)).thenReturn(chargeAmountMoney);
         when(loanTransaction.getLoan()).thenReturn(loan);
-        when(loan.loanCurrency()).thenReturn(currency);
+        when(loan.getCurrency()).thenReturn(currency);
         when(loanTransaction.getLoan().getLoanProductRelatedDetail()).thenReturn(loanProductRelatedDetail);
         when(loanProductRelatedDetail.getLoanScheduleProcessingType()).thenReturn(LoanScheduleProcessingType.HORIZONTAL);
         when(loan.getDisbursementDate()).thenReturn(disbursementDate);
-        when(charge.isDueForCollectionFromIncludingAndUpToAndIncluding(disbursementDate, installment.getDueDate())).thenReturn(true);
+        when(charge.isDueInPeriod(disbursementDate, installment.getDueDate(), true)).thenReturn(true);
         when(installment.getInstallmentNumber()).thenReturn(1);
         when(charge.updatePaidAmountBy(refEq(chargeAmountMoney), eq(1), refEq(zero))).thenReturn(chargeAmountMoney);
         when(loanTransaction.isPenaltyPayment()).thenReturn(false);
@@ -421,6 +428,87 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         assertEquals(0, interest.getValue().getAmount().compareTo(BigDecimal.ZERO));
     }
 
+    @Test
+    public void testProcessLatestTransaction_PassesThroughHandlingPaymentAllocationForInterestBearingProgressiveLoan() {
+        // Set up transaction amount, currency, and dates
+        BigDecimal transactionAmount = BigDecimal.valueOf(100.00);
+        LocalDate disbursementDate = LocalDate.of(2023, 1, 1);
+        LocalDate transactionDate = disbursementDate.plusMonths(1);
+
+        MonetaryCurrency currency = MONETARY_CURRENCY;
+        Money transactionAmountMoney = Money.of(currency, transactionAmount);
+
+        // Set up LoanTransaction
+        LoanTransaction loanTransaction = mock(LoanTransaction.class);
+        when(loanTransaction.getTypeOf()).thenReturn(LoanTransactionType.CHARGE_PAYMENT);
+        when(loanTransaction.getAmount()).thenReturn(transactionAmount);
+        when(loanTransaction.getAmount(currency)).thenReturn(transactionAmountMoney);
+        when(loanTransaction.getTransactionDate()).thenReturn(transactionDate);
+
+        // Set up Loan and related details
+        Loan loan = mock(Loan.class);
+        LoanProductRelatedDetail loanProductRelatedDetail = mock(LoanProductRelatedDetail.class);
+        LoanPaymentAllocationRule loanPaymentAllocationRule = mock(LoanPaymentAllocationRule.class);
+        when(loan.isInterestBearing()).thenReturn(true);
+        when(loanProductRelatedDetail.isInterestRecalculationEnabled()).thenReturn(true);
+
+        when(loanTransaction.getLoan()).thenReturn(loan);
+        when(loan.getCurrency()).thenReturn(currency);
+        when(loan.getLoanProductRelatedDetail()).thenReturn(loanProductRelatedDetail);
+        when(loanProductRelatedDetail.getLoanScheduleProcessingType()).thenReturn(LoanScheduleProcessingType.HORIZONTAL);
+        when(loan.getPaymentAllocationRules()).thenReturn(List.of(loanPaymentAllocationRule));
+        when(loan.isInterestBearing()).thenReturn(true);
+        when(loanProductRelatedDetail.isInterestRecalculationEnabled()).thenReturn(true);
+
+        when(loanPaymentAllocationRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.DEFAULT);
+        when(loanPaymentAllocationRule.getAllocationTypes())
+                .thenReturn(List.of(PaymentAllocationType.DUE_PRINCIPAL, PaymentAllocationType.DUE_INTEREST));
+
+        // Create an installment that is due
+        LoanRepaymentScheduleInstallment installment = spy(
+                new LoanRepaymentScheduleInstallment(loan, 1, disbursementDate, transactionDate, BigDecimal.valueOf(100L),
+                        BigDecimal.valueOf(0L), BigDecimal.valueOf(100L), BigDecimal.valueOf(0L), false, null, BigDecimal.ZERO));
+
+        // Let's set up a credit transaction so that its transaction date coincides with the payment due date
+        when(loanTransaction.getTransactionDate()).thenReturn(transactionDate);
+        when(loanTransaction.isOn(transactionDate)).thenReturn(true);
+
+        List<LoanRepaymentScheduleInstallment> installments = List.of(installment);
+        MoneyHolder overpaymentHolder = new MoneyHolder(Money.zero(currency));
+        ProgressiveLoanInterestScheduleModel model = mock(ProgressiveLoanInterestScheduleModel.class);
+        when(model.getMaturityDate()).thenReturn(LocalDate.of(2023, 12, 31));
+        ChangedTransactionDetail changedTransactionDetail = mock(ChangedTransactionDetail.class);
+
+        // Set up TransactionCtx with installments and charges
+        TransactionCtx ctx = new ProgressiveTransactionCtx(currency, installments, Set.of(), overpaymentHolder, changedTransactionDetail,
+                model);
+
+        // Mock additional necessary methods
+        LoanCharge loanCharge = mock(LoanCharge.class);
+        when(loanTransaction.getLoanChargesPaid())
+                .thenReturn(Set.of(new LoanChargePaidBy(loanTransaction, loanCharge, transactionAmount, 1)));
+        when(loanCharge.getAmountOutstanding(currency)).thenReturn(transactionAmountMoney);
+        when(loanTransaction.isAfter(any(LocalDate.class))).thenReturn(true); // Mock to simulate past due date check
+
+        // Run the processLatestTransaction method
+        underTest.processLatestTransaction(loanTransaction, ctx);
+
+        // Verification of expected behavior
+        ArgumentCaptor<Money> paidPortionCaptor = ArgumentCaptor.forClass(Money.class);
+        ArgumentCaptor<LocalDate> payDateCaptor = ArgumentCaptor.forClass(LocalDate.class);
+
+        // Verify `payPrincipal` is called when allocation type is DUE_PRINCIPAL
+        Mockito.verify(emiCalculator, atLeastOnce()).payPrincipal(eq(model), eq(transactionDate), payDateCaptor.capture(),
+                paidPortionCaptor.capture());
+        Money paidPortion = paidPortionCaptor.getValue();
+        LocalDate payDate = payDateCaptor.getValue();
+
+        // Assert that `paidPortion` and `payDate` match expected values
+        assertNotNull(paidPortion);
+        assertNotNull(payDate);
+        assertEquals(transactionAmountMoney.toString(), paidPortion.toString());
+    }
+
     private LoanRepaymentScheduleInstallment createMockInstallment(LocalDate localDate, boolean isAdditional) {
         LoanRepaymentScheduleInstallment installment = mock(LoanRepaymentScheduleInstallment.class);
         lenient().when(installment.isAdditional()).thenReturn(isAdditional);
@@ -473,7 +561,7 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
     @Test
     public void calculateChargebackAllocationMap() {
         Map<AllocationType, Money> result;
-        MonetaryCurrency currency = mock(MonetaryCurrency.class);
+        MonetaryCurrency currency = new MonetaryCurrency("usd", 2, null);
 
         result = underTest.calculateChargebackAllocationMap(allocationMap(50.0, 100.0, 200.0, 12.0, currency), BigDecimal.valueOf(50.0),
                 List.of(PRINCIPAL, INTEREST, FEE, PENALTY), currency);

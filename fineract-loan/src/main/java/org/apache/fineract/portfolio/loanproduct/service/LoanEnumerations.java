@@ -33,7 +33,7 @@ import org.apache.fineract.portfolio.loanproduct.domain.AmortizationMethod;
 import org.apache.fineract.portfolio.loanproduct.domain.InterestCalculationPeriodMethod;
 import org.apache.fineract.portfolio.loanproduct.domain.InterestMethod;
 import org.apache.fineract.portfolio.loanproduct.domain.InterestRecalculationCompoundingMethod;
-import org.apache.fineract.portfolio.loanproduct.domain.LoanPreClosureInterestCalculationStrategy;
+import org.apache.fineract.portfolio.loanproduct.domain.LoanPreCloseInterestCalculationStrategy;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductParamType;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductValueConditionType;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanRescheduleStrategyMethod;
@@ -323,6 +323,8 @@ public final class LoanEnumerations {
                     LoanTransactionType.ACCRUAL_ACTIVITY.getCode(), "Accrual Activity");
             case INTEREST_REFUND -> new LoanTransactionEnumData(LoanTransactionType.INTEREST_REFUND.getValue().longValue(),
                     LoanTransactionType.INTEREST_REFUND.getCode(), "Interest Refund");
+            case ACCRUAL_ADJUSTMENT -> new LoanTransactionEnumData(LoanTransactionType.ACCRUAL_ADJUSTMENT.getValue().longValue(),
+                    LoanTransactionType.ACCRUAL_ADJUSTMENT.getCode(), "Accrual Adjustment");
         };
     }
 
@@ -520,19 +522,19 @@ public final class LoanEnumerations {
     }
 
     public static EnumOptionData preCloseInterestCalculationStrategy(final int id) {
-        return preCloseInterestCalculationStrategy(LoanPreClosureInterestCalculationStrategy.fromInt(id));
+        return preCloseInterestCalculationStrategy(LoanPreCloseInterestCalculationStrategy.fromInt(id));
     }
 
-    public static EnumOptionData preCloseInterestCalculationStrategy(final LoanPreClosureInterestCalculationStrategy type) {
+    public static EnumOptionData preCloseInterestCalculationStrategy(final LoanPreCloseInterestCalculationStrategy type) {
         EnumOptionData optionData = null;
         switch (type) {
             case TILL_PRE_CLOSURE_DATE:
-                optionData = new EnumOptionData(LoanPreClosureInterestCalculationStrategy.TILL_PRE_CLOSURE_DATE.getValue().longValue(),
-                        LoanPreClosureInterestCalculationStrategy.TILL_PRE_CLOSURE_DATE.getCode(), "Till Pre-Close Date");
+                optionData = new EnumOptionData(LoanPreCloseInterestCalculationStrategy.TILL_PRE_CLOSURE_DATE.getValue().longValue(),
+                        LoanPreCloseInterestCalculationStrategy.TILL_PRE_CLOSURE_DATE.getCode(), "Till Pre-Close Date");
             break;
             case TILL_REST_FREQUENCY_DATE:
-                optionData = new EnumOptionData(LoanPreClosureInterestCalculationStrategy.TILL_REST_FREQUENCY_DATE.getValue().longValue(),
-                        LoanPreClosureInterestCalculationStrategy.TILL_REST_FREQUENCY_DATE.getCode(), "Till Rest Frequency Date");
+                optionData = new EnumOptionData(LoanPreCloseInterestCalculationStrategy.TILL_REST_FREQUENCY_DATE.getValue().longValue(),
+                        LoanPreCloseInterestCalculationStrategy.TILL_REST_FREQUENCY_DATE.getCode(), "Till Rest Frequency Date");
             break;
             case NONE:
             break;

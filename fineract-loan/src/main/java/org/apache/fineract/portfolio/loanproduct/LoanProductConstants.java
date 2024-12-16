@@ -97,6 +97,7 @@ public interface LoanProductConstants {
     String recalculationCompoundingFrequencyNthDayParamName = "recalculationCompoundingFrequencyNthDayType";
     String recalculationCompoundingFrequencyOnDayParamName = "recalculationCompoundingFrequencyOnDayType";
     String isCompoundingToBePostedAsTransactionParamName = "isCompoundingToBePostedAsTransaction";
+    String disallowInterestCalculationOnPastDueParamName = "disallowInterestCalculationOnPastDue";
 
     // Guarantee related
     String holdGuaranteeFundsParamName = "holdGuaranteeFunds";
@@ -166,5 +167,6 @@ public interface LoanProductConstants {
 
     String ENABLE_ACCRUAL_ACTIVITY_POSTING = "enableAccrualActivityPosting";
     String SUPPORTED_INTEREST_REFUND_TYPES = "supportedInterestRefundTypes";
+    String CHARGE_OFF_BEHAVIOUR = "chargeOffBehaviour";
 
 }

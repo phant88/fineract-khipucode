@@ -39,6 +39,9 @@ public class FineractProperties {
     private String idempotencyKeyHeaderName;
 
     private Boolean insecureHttpClient;
+    private long clientConnectTimeout;
+    private long clientReadTimeout;
+    private long clientWriteTimeout;
 
     private FineractTenantProperties tenant;
 
@@ -279,6 +282,9 @@ public class FineractProperties {
 
         private int defaultTaskExecutorCorePoolSize;
         private int defaultTaskExecutorMaxPoolSize;
+        private int tenantUpgradeTaskExecutorCorePoolSize;
+        private int tenantUpgradeTaskExecutorMaxPoolSize;
+        private int tenantUpgradeTaskExecutorQueueCapacity;
     }
 
     @Getter
@@ -288,6 +294,9 @@ public class FineractProperties {
         private boolean enabled;
         private FineractExternalEventsProducerProperties producer;
         private int partitionSize;
+        private int threadPoolCorePoolSize;
+        private int threadPoolMaxPoolSize;
+        private int threadPoolQueueCapacity;
     }
 
     @Getter

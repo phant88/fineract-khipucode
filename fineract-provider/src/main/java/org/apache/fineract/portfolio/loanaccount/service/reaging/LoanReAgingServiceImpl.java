@@ -24,7 +24,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -52,6 +51,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.Loa
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
 import org.apache.fineract.portfolio.loanaccount.exception.LoanTransactionNotFoundException;
+import org.apache.fineract.portfolio.loanaccount.serialization.LoanChargeValidator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.apache.fineract.portfolio.note.domain.Note;
 import org.apache.fineract.portfolio.note.domain.NoteRepository;
@@ -71,6 +71,7 @@ public class LoanReAgingServiceImpl {
     private final LoanReAgingParameterRepository reAgingParameterRepository;
     private final LoanRepaymentScheduleTransactionProcessorFactory loanRepaymentScheduleTransactionProcessorFactory;
     private final NoteRepository noteRepository;
+    private final LoanChargeValidator loanChargeValidator;
 
     public CommandProcessingResult reAge(Long loanId, JsonCommand command) {
         Loan loan = loanAssembler.assembleFrom(loanId);
@@ -122,8 +123,7 @@ public class LoanReAgingServiceImpl {
         }
         reverseReAgeTransaction(reAgeTransaction, command);
         loanTransactionRepository.saveAndFlush(reAgeTransaction);
-
-        reProcessLoanTransactions(reAgeTransaction.getLoan());
+        loan.reprocessTransactions();
         loan.updateLoanScheduleDependentDerivedFields();
         persistNote(loan, command, changes);
 
@@ -143,6 +143,8 @@ public class LoanReAgingServiceImpl {
 
     private void reverseReAgeTransaction(LoanTransaction reAgeTransaction, JsonCommand command) {
         ExternalId reversalExternalId = externalIdFactory.createFromCommand(command, LoanReAgingApiConstants.externalIdParameterName);
+        loanChargeValidator.validateRepaymentTypeTransactionNotBeforeAChargeRefund(reAgeTransaction.getLoan(), reAgeTransaction,
+                "reversed");
         reAgeTransaction.reverse(reversalExternalId);
         reAgeTransaction.manuallyAdjustedOrReversed();
     }
@@ -177,15 +179,6 @@ public class LoanReAgingServiceImpl {
         Integer numberOfInstallments = command.integerValueOfParameterNamed(LoanReAgingApiConstants.numberOfInstallments);
         Integer periodFrequencyNumber = command.integerValueOfParameterNamed(LoanReAgingApiConstants.frequencyNumber);
         return new LoanReAgeParameter(reAgeTransaction, periodFrequencyType, periodFrequencyNumber, startDate, numberOfInstallments);
-    }
-
-    private void reProcessLoanTransactions(Loan loan) {
-        final List<LoanTransaction> filteredTransactions = loan.retrieveListOfTransactionsForReprocessing();
-
-        final LoanRepaymentScheduleTransactionProcessor loanRepaymentScheduleTransactionProcessor = loanRepaymentScheduleTransactionProcessorFactory
-                .determineProcessor(loan.transactionProcessingStrategy());
-        loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(loan.getDisbursementDate(), filteredTransactions,
-                loan.getCurrency(), loan.getRepaymentScheduleInstallments(), loan.getActiveCharges());
     }
 
     private void persistNote(Loan loan, JsonCommand command, Map<String, Object> changes) {

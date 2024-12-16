@@ -45,11 +45,13 @@ import org.apache.fineract.portfolio.charge.domain.Charge;
 import org.apache.fineract.portfolio.charge.domain.ChargeRepositoryWrapper;
 import org.apache.fineract.portfolio.delinquency.domain.DelinquencyBucket;
 import org.apache.fineract.portfolio.delinquency.domain.DelinquencyBucketRepository;
+import org.apache.fineract.portfolio.delinquency.exception.DelinquencyBucketNotFoundException;
 import org.apache.fineract.portfolio.floatingrates.domain.FloatingRate;
 import org.apache.fineract.portfolio.floatingrates.domain.FloatingRateRepositoryWrapper;
 import org.apache.fineract.portfolio.fund.domain.Fund;
 import org.apache.fineract.portfolio.fund.domain.FundRepository;
 import org.apache.fineract.portfolio.fund.exception.FundNotFoundException;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanChargeOffBehaviour;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTransactionProcessorFactory;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.AprCalculator;
@@ -173,7 +175,7 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
         DelinquencyBucket delinquencyBucket = null;
         if (delinquencyBucketId != null) {
             delinquencyBucket = delinquencyBucketRepository.findById(delinquencyBucketId)
-                    .orElseThrow(() -> new FundNotFoundException(delinquencyBucketId));
+                    .orElseThrow(() -> DelinquencyBucketNotFoundException.notFound(delinquencyBucketId));
         }
         return delinquencyBucket;
     }
@@ -274,6 +276,11 @@ public class LoanProductWritePlatformServiceJpaRepositoryImpl implements LoanPro
                     supportedInterestRefundTypes.add(LoanSupportedInterestRefundTypes.valueOf(value.getAsString()));
                 });
                 product.getLoanProductRelatedDetail().setSupportedInterestRefundTypes(supportedInterestRefundTypes);
+            }
+
+            if (command.parameterExists(LoanProductConstants.CHARGE_OFF_BEHAVIOUR)) {
+                product.getLoanProductRelatedDetail().setChargeOffBehaviour(
+                        command.enumValueOfParameterNamed(LoanProductConstants.CHARGE_OFF_BEHAVIOUR, LoanChargeOffBehaviour.class));
             }
 
             if (!changes.isEmpty()) {

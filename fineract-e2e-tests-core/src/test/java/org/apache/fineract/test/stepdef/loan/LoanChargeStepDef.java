@@ -26,6 +26,7 @@ import io.cucumber.java.en.And;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +52,9 @@ import org.apache.fineract.test.helper.ErrorHelper;
 import org.apache.fineract.test.helper.ErrorMessageHelper;
 import org.apache.fineract.test.helper.ErrorResponse;
 import org.apache.fineract.test.messaging.EventAssertion;
+import org.apache.fineract.test.messaging.event.EventCheckHelper;
 import org.apache.fineract.test.messaging.event.loan.charge.LoanAddChargeEvent;
+import org.apache.fineract.test.messaging.store.EventStore;
 import org.apache.fineract.test.stepdef.AbstractStepDef;
 import org.apache.fineract.test.support.TestContextKey;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +76,10 @@ public class LoanChargeStepDef extends AbstractStepDef {
     private LoansApi loansApi;
     @Autowired
     private EventAssertion eventAssertion;
+    @Autowired
+    private EventCheckHelper eventCheckHelper;
+    @Autowired
+    private EventStore eventStore;
 
     @When("Admin adds {string} due date charge with {string} due date and {double} EUR transaction amount")
     public void addChargeDueDate(String chargeType, String transactionDate, double transactionAmount) throws IOException {
@@ -142,6 +149,7 @@ public class LoanChargeStepDef extends AbstractStepDef {
 
     @And("Admin adds a {double} % Processing charge to the loan with {string} locale on date: {string}")
     public void addProcessingFee(double chargeAmount, String locale, String date) throws IOException {
+        eventStore.reset();
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
         PostLoansLoanIdChargesRequest loanIdChargesRequest = LoanChargeRequestFactory.defaultLoanChargeRequest()
@@ -152,10 +160,12 @@ public class LoanChargeStepDef extends AbstractStepDef {
                 .execute();
         ErrorHelper.checkSuccessfulApiCall(loanChargeResponse);
         testContext().set(TestContextKey.ADD_PROCESSING_FEE_RESPONSE, loanChargeResponse);
+        eventCheckHelper.loanBalanceChangedEventCheck(loanId);
     }
 
     @And("Admin adds an NSF fee because of payment bounce with {string} transaction date")
     public void addNSFfee(String date) throws IOException {
+        eventStore.reset();
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
         PostLoansLoanIdChargesRequest loanIdChargesRequest = LoanChargeRequestFactory.defaultLoanChargeRequest()
@@ -166,6 +176,7 @@ public class LoanChargeStepDef extends AbstractStepDef {
                 .execute();
         ErrorHelper.checkSuccessfulApiCall(loanChargeResponse);
         testContext().set(TestContextKey.ADD_NSF_FEE_RESPONSE, loanChargeResponse);
+        eventCheckHelper.loanBalanceChangedEventCheck(loanId);
     }
 
     @And("Admin waives charge")
@@ -248,9 +259,9 @@ public class LoanChargeStepDef extends AbstractStepDef {
         GetLoansLoanIdChargesChargeIdResponse body = chargeDetails.body();
 
         eventAssertion.assertEvent(LoanAddChargeEvent.class, loanChargeResponse.body().getResourceId())
-                .extractingData(LoanChargeDataV1::getName).isEqualTo(body.getName())
-                .extractingData(loanChargeDataV1 -> loanChargeDataV1.getAmount().longValue()).isEqualTo(body.getAmount().longValue())
-                .extractingData(LoanChargeDataV1::getDueDate).isEqualTo(formatter.format(body.getDueDate()));
+                .extractingData(LoanChargeDataV1::getName).isEqualTo(body.getName()).extractingBigDecimal(LoanChargeDataV1::getAmount)
+                .isEqualTo(BigDecimal.valueOf(body.getAmount())).extractingData(LoanChargeDataV1::getDueDate)
+                .isEqualTo(formatter.format(body.getDueDate()));
     }
 
     @Then("Loan charge transaction with the following data results a {int} error and {string} error message")
@@ -290,7 +301,7 @@ public class LoanChargeStepDef extends AbstractStepDef {
         assertThat(errorMessageActual).as(ErrorMessageHelper.wrongErrorMessage(errorMessageActual, errorMessageExpected))
                 .isEqualTo(errorMessageExpected);
 
-        log.info("ERROR CODE: {}", errorCodeActual);
-        log.info("ERROR MESSAGE: {}", errorMessageActual);
+        log.debug("ERROR CODE: {}", errorCodeActual);
+        log.debug("ERROR MESSAGE: {}", errorMessageActual);
     }
 }

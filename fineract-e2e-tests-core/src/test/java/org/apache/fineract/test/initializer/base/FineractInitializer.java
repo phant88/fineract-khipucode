@@ -61,7 +61,6 @@ public class FineractInitializer implements InitializingBean {
         for (FineractGlobalInitializerStep initializerStep : globalInitializerSteps) {
             initializerStep.initialize();
         }
-
         businessDateHelper.setBusinessDateToday();
     }
 
@@ -69,7 +68,6 @@ public class FineractInitializer implements InitializingBean {
         for (FineractSuiteInitializerStep initializerStep : suiteInitializerSteps) {
             initializerStep.initializeForSuite();
         }
-
         businessDateHelper.setBusinessDateToday();
     }
 
@@ -77,7 +75,6 @@ public class FineractInitializer implements InitializingBean {
         for (FineractScenarioInitializerStep scenarioInitializerStep : scenarioInitializerSteps) {
             scenarioInitializerStep.initializeForScenario();
         }
-
         businessDateHelper.setBusinessDateToday();
     }
 
@@ -85,7 +82,6 @@ public class FineractInitializer implements InitializingBean {
         for (FineractSuiteInitializerStep initializerStep : suiteInitializerSteps) {
             initializerStep.resetAfterSuite();
         }
-
         businessDateHelper.setBusinessDateToday();
     }
 }

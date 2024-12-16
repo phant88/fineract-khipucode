@@ -29,7 +29,6 @@ import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.Loan
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateRescheduleReasonComment;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateRescheduleReasonId;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateRescheduleRequestStatus;
-import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateReschedulingInstallment;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateSubmittedOnDate;
 import static org.apache.fineract.portfolio.loanaccount.rescheduleloan.data.LoanRescheduleRequestDataValidatorImpl.validateSupportedParameters;
 
@@ -109,7 +108,7 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
         if (hasInterestRateChange) {
             installment = loan.getRelatedRepaymentScheduleInstallment(rescheduleFromDate);
         } else {
-            installment = loan.getRepaymentScheduleInstallment(rescheduleFromDate);
+            installment = loan.fetchLoanRepaymentScheduleInstallmentByDueDate(rescheduleFromDate);
         }
 
         validateReschedulingInstallment(dataValidatorBuilder, installment);
@@ -117,6 +116,14 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
 
         if (!dataValidationErrors.isEmpty()) {
             throw new PlatformApiDataValidationException(dataValidationErrors);
+        }
+    }
+
+    @Override
+    public void validateReschedulingInstallment(DataValidatorBuilder dataValidatorBuilder, LoanRepaymentScheduleInstallment installment) {
+        if (installment == null) {
+            dataValidatorBuilder.reset().parameter(RescheduleLoansApiConstants.rescheduleFromDateParamName)
+                    .failWithCode("repayment.schedule.installment.does.not.exist", "Repayment schedule installment does not exist");
         }
     }
 
@@ -161,7 +168,7 @@ public class ProgressiveLoanRescheduleRequestDataValidator implements LoanResche
                         loan.getId(), rescheduleFromDate);
             }
         } else {
-            installment = loan.getRepaymentScheduleInstallment(rescheduleFromDate);
+            installment = loan.fetchLoanRepaymentScheduleInstallmentByDueDate(rescheduleFromDate);
         }
         validateReschedulingInstallment(dataValidatorBuilder, installment);
         validateForOverdueCharges(dataValidatorBuilder, loan, installment);

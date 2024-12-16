@@ -20,12 +20,14 @@ package org.apache.fineract.portfolio.loanaccount.loanschedule.data;
 
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.Optional;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
 import org.apache.fineract.organisation.monetary.domain.Money;
 
@@ -41,25 +43,31 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
     private LocalDate dueDate;
     @Setter
     private BigDecimal rateFactor;
+    @Setter
+    private BigDecimal rateFactorTillPeriodDueDate;
     private Money disbursementAmount;
     private Money balanceCorrectionAmount;
     private Money outstandingLoanBalance;
+    private final MathContext mc;
 
     public InterestPeriod(RepaymentPeriod repaymentPeriod, LocalDate fromDate, LocalDate dueDate, BigDecimal rateFactor,
-            Money disbursementAmount, Money balanceCorrectionAmount, Money outstandingLoanBalance) {
+            BigDecimal rateFactorTillPeriodDueDate, Money disbursementAmount, Money balanceCorrectionAmount, Money outstandingLoanBalance,
+            MathContext mc) {
         this.repaymentPeriod = repaymentPeriod;
         this.fromDate = fromDate;
         this.dueDate = dueDate;
         this.rateFactor = rateFactor;
+        this.rateFactorTillPeriodDueDate = rateFactorTillPeriodDueDate;
         this.disbursementAmount = disbursementAmount;
         this.balanceCorrectionAmount = balanceCorrectionAmount;
         this.outstandingLoanBalance = outstandingLoanBalance;
+        this.mc = mc;
     }
 
     public InterestPeriod(RepaymentPeriod repaymentPeriod, InterestPeriod interestPeriod) {
         this(repaymentPeriod, interestPeriod.getFromDate(), interestPeriod.getDueDate(), interestPeriod.getRateFactor(),
-                interestPeriod.getDisbursementAmount(), interestPeriod.getBalanceCorrectionAmount(),
-                interestPeriod.getOutstandingLoanBalance());
+                interestPeriod.getRateFactorTillPeriodDueDate(), interestPeriod.getDisbursementAmount(),
+                interestPeriod.getBalanceCorrectionAmount(), interestPeriod.getOutstandingLoanBalance(), interestPeriod.getMc());
     }
 
     @Override
@@ -72,35 +80,49 @@ public class InterestPeriod implements Comparable<InterestPeriod> {
     }
 
     public void addDisbursementAmount(final Money disbursementAmount) {
-        this.disbursementAmount = MathUtil.plus(this.disbursementAmount, disbursementAmount);
+        this.disbursementAmount = MathUtil.plus(this.disbursementAmount, disbursementAmount, mc);
     }
 
     public Money getCalculatedDueInterest() {
-        return getOutstandingLoanBalance().multipliedBy(getRateFactor());
+        long lengthTillPeriodDueDate = getLengthTillPeriodDueDate();
+        final BigDecimal interestDueTillRepaymentDueDate = lengthTillPeriodDueDate == 0 //
+                ? BigDecimal.ZERO //
+                : getOutstandingLoanBalance() //
+                        .multipliedBy(getRateFactorTillPeriodDueDate(), mc).getAmount() //
+                        .divide(BigDecimal.valueOf(lengthTillPeriodDueDate), mc) //
+                        .multiply(BigDecimal.valueOf(getLength()), mc); //
+        return Money.of(outstandingLoanBalance.getCurrencyData(), interestDueTillRepaymentDueDate, mc);
+    }
+
+    public long getLength() {
+        return DateUtils.getDifferenceInDays(fromDate, dueDate);
+    }
+
+    public long getLengthTillPeriodDueDate() {
+        return DateUtils.getDifferenceInDays(fromDate, repaymentPeriod.getDueDate());
     }
 
     public void updateOutstandingLoanBalance() {
         if (isFirstInterestPeriod()) {
             Optional<RepaymentPeriod> previousRepaymentPeriod = getRepaymentPeriod().getPrevious();
             if (previousRepaymentPeriod.isPresent()) {
-                InterestPeriod previousInterestPeriod = previousRepaymentPeriod.get().getInterestPeriods()
-                        .get(previousRepaymentPeriod.get().getInterestPeriods().size() - 1);
+                InterestPeriod previousInterestPeriod = previousRepaymentPeriod.get().getLastInterestPeriod();
                 this.outstandingLoanBalance = previousInterestPeriod.getOutstandingLoanBalance()//
-                        .plus(previousInterestPeriod.getDisbursementAmount())//
-                        .plus(previousInterestPeriod.getBalanceCorrectionAmount())//
-                        .minus(previousRepaymentPeriod.get().getDuePrincipal())//
-                        .plus(previousRepaymentPeriod.get().getPaidPrincipal());//
+                        .plus(previousInterestPeriod.getDisbursementAmount(), mc)//
+                        .plus(previousInterestPeriod.getBalanceCorrectionAmount(), mc)//
+                        .minus(previousRepaymentPeriod.get().getDuePrincipal(), mc)//
+                        .plus(previousRepaymentPeriod.get().getPaidPrincipal(), mc);//
             }
         } else {
             int index = getRepaymentPeriod().getInterestPeriods().indexOf(this);
             InterestPeriod previousInterestPeriod = getRepaymentPeriod().getInterestPeriods().get(index - 1);
             this.outstandingLoanBalance = previousInterestPeriod.getOutstandingLoanBalance() //
-                    .plus(previousInterestPeriod.getBalanceCorrectionAmount()) //
-                    .plus(previousInterestPeriod.getDisbursementAmount()); //
+                    .plus(previousInterestPeriod.getBalanceCorrectionAmount(), mc) //
+                    .plus(previousInterestPeriod.getDisbursementAmount(), mc); //
         }
     }
 
-    private boolean isFirstInterestPeriod() {
-        return getRepaymentPeriod().getInterestPeriods().get(0).equals(this);
+    public boolean isFirstInterestPeriod() {
+        return this.equals(getRepaymentPeriod().getFirstInterestPeriod());
     }
 }

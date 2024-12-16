@@ -24,7 +24,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
@@ -48,6 +47,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.LoanRepaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
+import org.apache.fineract.portfolio.loanaccount.serialization.LoanChargeValidator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +63,7 @@ public class LoanReAmortizationServiceImpl {
     private final BusinessEventNotifierService businessEventNotifierService;
     private final LoanTransactionRepository loanTransactionRepository;
     private final LoanRepaymentScheduleTransactionProcessorFactory loanRepaymentScheduleTransactionProcessorFactory;
+    private final LoanChargeValidator loanChargeValidator;
 
     public CommandProcessingResult reAmortize(Long loanId, JsonCommand command) {
         Loan loan = loanAssembler.assembleFrom(loanId);
@@ -127,18 +128,11 @@ public class LoanReAmortizationServiceImpl {
     private void reverseReAmortizeTransaction(LoanTransaction reAmortizeTransaction, JsonCommand command) {
         ExternalId reversalExternalId = externalIdFactory.createFromCommand(command,
                 LoanReAmortizationApiConstants.externalIdParameterName);
+        loanChargeValidator.validateRepaymentTypeTransactionNotBeforeAChargeRefund(reAmortizeTransaction.getLoan(), reAmortizeTransaction,
+                "reversed");
         reAmortizeTransaction.reverse(reversalExternalId);
         reAmortizeTransaction.manuallyAdjustedOrReversed();
-        reProcessLoanTransactions(reAmortizeTransaction.getLoan());
-    }
-
-    private void reProcessLoanTransactions(Loan loan) {
-        final List<LoanTransaction> filteredTransactions = loan.retrieveListOfTransactionsForReprocessing();
-
-        final LoanRepaymentScheduleTransactionProcessor loanRepaymentScheduleTransactionProcessor = loanRepaymentScheduleTransactionProcessorFactory
-                .determineProcessor(loan.transactionProcessingStrategy());
-        loanRepaymentScheduleTransactionProcessor.reprocessLoanTransactions(loan.getDisbursementDate(), filteredTransactions,
-                loan.getCurrency(), loan.getRepaymentScheduleInstallments(), loan.getActiveCharges());
+        reAmortizeTransaction.getLoan().reprocessTransactions();
     }
 
     private LoanTransaction findLatestNonReversedReAmortizeTransaction(Loan loan) {

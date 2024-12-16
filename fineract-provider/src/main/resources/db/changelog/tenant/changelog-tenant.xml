@@ -169,4 +169,13 @@
     <include file="parts/0148_transaction_summary_with_asset_owner_report_performance_improvement.xml" relativeToChangelogFile="true" />
     <include file="parts/0149_update_global_configuration_names.xml" relativeToChangelogFile="true" />
     <include file="parts/0150_transaction_summary_with_asset_owner_report_interest_waiver_interest_refund_added.xml" relativeToChangelogFile="true" />
+    <include file="parts/0151_interest_refund_business_events.xml" relativeToChangelogFile="true" />
+    <include file="parts/0152_update_password_validation_policy.xml" relativeToChangelogFile="true" />
+    <include file="parts/0153_add_charge_off_reason_id_to_acc_product_mapping.xml" relativeToChangelogFile="true" />
+    <include file="parts/0154_add_interest_refund_to_r_enum_value.xml" relativeToChangelogFile="true" />
+    <include file="parts/0155_add_configuration_enable_immediate_charge_accrual_post_maturity.xml" relativeToChangelogFile="true" />
+    <include file="parts/0156_add_disallow_interest_calc_on_past_due_field.xml" relativeToChangelogFile="true" />
+    <include file="parts/0157_create_index_m_loan_transaction_relation.xml" relativeToChangelogFile="true" />
+    <include file="parts/0158_create_acc_gl_journal_entry_annual_summary.xml" relativeToChangelogFile="true" />
+    <include file="parts/0159_trial_balance_summary_with_asset_owner_year_end_summary.xml" relativeToChangelogFile="true" />
 </databaseChangeLog>

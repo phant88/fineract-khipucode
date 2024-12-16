@@ -44,6 +44,7 @@ import org.apache.fineract.portfolio.charge.service.ChargeReadPlatformService;
 import org.apache.fineract.portfolio.common.service.CommonEnumerations;
 import org.apache.fineract.portfolio.delinquency.data.DelinquencyBucketData;
 import org.apache.fineract.portfolio.delinquency.service.DelinquencyReadPlatformService;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanChargeOffBehaviour;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleProcessingType;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType;
 import org.apache.fineract.portfolio.loanproduct.data.AdvancedPaymentData;
@@ -103,7 +104,11 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
 
     @Override
     public LoanProduct retrieveLoanProductByExternalId(final ExternalId externalId) {
-        return loanProductRepository.findByExternalId(externalId);
+        final LoanProduct loanProduct = loanProductRepository.findByExternalId(externalId);
+        if (loanProduct == null) {
+            throw new LoanProductNotFoundException(externalId);
+        }
+        return loanProduct;
     }
 
     @Override
@@ -258,7 +263,9 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
                     + "lpr.compounding_frequency_weekday_enum as compoundingFrequencyWeekDayEnum, "
                     + "lpr.compounding_frequency_on_day as compoundingFrequencyOnDay, "
                     + "lpr.is_compounding_to_be_posted_as_transaction as isCompoundingToBePostedAsTransaction, "
-                    + "lpr.allow_compounding_on_eod as allowCompoundingOnEod, " + "lp.hold_guarantee_funds as holdGuaranteeFunds, "
+                    + "lpr.allow_compounding_on_eod as allowCompoundingOnEod, "
+                    + "lpr.disallow_interest_calc_on_past_due as disallowInterestCalculationOnPastDue, "
+                    + "lp.hold_guarantee_funds as holdGuaranteeFunds, "
                     + "lp.principal_threshold_for_last_installment as principalThresholdForLastInstallment, "
                     + "lp.fixed_principal_percentage_per_installment fixedPrincipalPercentagePerInstallment, "
                     + "lp.sync_expected_with_disbursement_date as syncExpectedWithDisbursementDate, "
@@ -278,8 +285,9 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
                     + "lfr.is_floating_interest_rate_calculation_allowed as isFloatingInterestRateCalculationAllowed, "
                     + "lp.allow_variabe_installments as isVariableIntallmentsAllowed, " + "lvi.minimum_gap as minimumGap, "
                     + "lvi.maximum_gap as maximumGap, dbuc.id as delinquencyBucketId, dbuc.name as delinquencyBucketName, "
-                    + "lp.can_use_for_topup as canUseForTopup, lp.is_equal_amortization as isEqualAmortization, lp.loan_schedule_type as loanScheduleType, lp.loan_schedule_processing_type as loanScheduleProcessingType, lp.supported_interest_refund_types as supportedInterestRefundTypes  "
-                    + " from m_product_loan lp " + " left join m_fund f on f.id = lp.fund_id "
+                    + "lp.can_use_for_topup as canUseForTopup, lp.is_equal_amortization as isEqualAmortization, lp.loan_schedule_type as loanScheduleType, lp.loan_schedule_processing_type as loanScheduleProcessingType, lp.supported_interest_refund_types as supportedInterestRefundTypes, "
+                    + "lp.charge_off_behaviour as chargeOffBehaviour" + " from m_product_loan lp "
+                    + " left join m_fund f on f.id = lp.fund_id "
                     + " left join m_product_loan_recalculation_details lpr on lpr.product_id=lp.id "
                     + " left join m_product_loan_guarantee_details lpg on lpg.loan_product_id=lp.id "
                     + " left join m_product_loan_configurable_attributes lca on lca.loan_product_id = lp.id "
@@ -475,12 +483,14 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
                 final EnumOptionData preCloseInterestCalculationStrategy = LoanEnumerations
                         .preCloseInterestCalculationStrategy(preCloseInterestCalculationStrategyEnumValue);
                 final boolean allowCompoundingOnEod = rs.getBoolean("allowCompoundingOnEod");
+                final boolean disallowInterestCalculationOnPastDue = rs.getBoolean("disallowInterestCalculationOnPastDue");
 
                 interestRecalculationData = new LoanProductInterestRecalculationData(lprId, productId, interestRecalculationCompoundingType,
                         rescheduleStrategyType, restFrequencyType, restFrequencyInterval, restFrequencyNthDayEnum, restFrequencyWeekDayEnum,
                         restFrequencyOnDay, compoundingFrequencyType, compoundingInterval, compoundingFrequencyNthDayEnum,
                         compoundingFrequencyWeekDayEnum, compoundingFrequencyOnDay, isArrearsBasedOnOriginalSchedule,
-                        isCompoundingToBePostedAsTransaction, preCloseInterestCalculationStrategy, allowCompoundingOnEod);
+                        isCompoundingToBePostedAsTransaction, preCloseInterestCalculationStrategy, allowCompoundingOnEod,
+                        disallowInterestCalculationOnPastDue);
             }
 
             final boolean amortization = rs.getBoolean("amortizationBoolean");
@@ -535,6 +545,8 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
                         .map(LoanSupportedInterestRefundTypes::valueOf)
                         .map(LoanSupportedInterestRefundTypes::getValueAsStringEnumOptionData).toList();
             }
+            final String chargeOffBehaviourStr = rs.getString("chargeOffBehaviour");
+            final LoanChargeOffBehaviour loanChargeOffBehaviour = LoanChargeOffBehaviour.valueOf(chargeOffBehaviourStr);
 
             return new LoanProductData(id, name, shortName, description, currency, principal, minPrincipal, maxPrincipal, tolerance,
                     numberOfRepayments, minNumberOfRepayments, maxNumberOfRepayments, repaymentEvery, interestRatePerPeriod,
@@ -557,7 +569,8 @@ public class LoanProductReadPlatformServiceImpl implements LoanProductReadPlatfo
                     dueDaysForRepaymentEvent, overDueDaysForRepaymentEvent, enableDownPayment, disbursedAmountPercentageForDownPayment,
                     enableAutoRepaymentForDownPayment, advancedPaymentData, creditAllocationData, repaymentStartDateType,
                     enableInstallmentLevelDelinquency, loanScheduleType.asEnumOptionData(), loanScheduleProcessingType.asEnumOptionData(),
-                    fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes);
+                    fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes,
+                    loanChargeOffBehaviour.getValueAsStringEnumOptionData());
         }
     }
 

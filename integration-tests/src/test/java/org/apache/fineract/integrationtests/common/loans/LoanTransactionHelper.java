@@ -91,6 +91,7 @@ import org.apache.fineract.integrationtests.client.IntegrationTest;
 import org.apache.fineract.integrationtests.common.CommonConstants;
 import org.apache.fineract.integrationtests.common.PaymentTypeHelper;
 import org.apache.fineract.integrationtests.common.Utils;
+import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.portfolio.delinquency.domain.DelinquencyAction;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -599,6 +600,11 @@ public class LoanTransactionHelper extends IntegrationTest {
 
     public PostLoansLoanIdTransactionsResponse makeLoanRepayment(final Long loanId, final PostLoansLoanIdTransactionsRequest request) {
         return ok(fineract().loanTransactions.executeLoanTransaction(loanId, request, "repayment"));
+    }
+
+    public PostLoansLoanIdTransactionsResponse makeLoanRepayment(final Long loanId, final PostLoansLoanIdTransactionsRequest request,
+            final String user, final String pass) {
+        return ok(newFineract(user, pass).loanTransactions.executeLoanTransaction(loanId, request, "repayment"));
     }
 
     public PostLoansLoanIdTransactionsResponse makeInterestPaymentWaiver(final Long loanId,
@@ -1133,7 +1139,7 @@ public class LoanTransactionHelper extends IntegrationTest {
         return new Gson().toJson(map);
     }
 
-    private String getApproveLoanAsJSON(final String approvalDate) {
+    public String getApproveLoanAsJSON(final String approvalDate) {
         return getApproveLoanAsJSON(approvalDate, null, null, null);
     }
 
@@ -1397,7 +1403,7 @@ public class LoanTransactionHelper extends IntegrationTest {
         return new Gson().toJson(map);
     }
 
-    private String createLoanOperationURL(final String command, final Integer loanID) {
+    public String createLoanOperationURL(final String command, final Integer loanID) {
         return "/fineract-provider/api/v1/loans/" + loanID + "?command=" + command + "&" + Utils.TENANT_IDENTIFIER;
     }
 
@@ -1482,6 +1488,15 @@ public class LoanTransactionHelper extends IntegrationTest {
 
     public HashMap getPrepayAmount(final RequestSpecification requestSpec, final ResponseSpecification responseSpec, final Integer loanID) {
         final String URL = "/fineract-provider/api/v1/loans/" + loanID + "/transactions/template?command=prepayLoan&"
+                + Utils.TENANT_IDENTIFIER;
+        final HashMap response = Utils.performServerGet(requestSpec, responseSpec, URL, "");
+        return response;
+    }
+
+    public HashMap getPrepayAmount(final RequestSpecification requestSpec, final ResponseSpecification responseSpec, final Integer loanID,
+            final LocalDate transactionDate) {
+        final String URL = "/fineract-provider/api/v1/loans/" + loanID
+                + "/transactions/template?command=prepayLoan&locale=en&dateFormat=yyyy-MM-dd&transactionDate=" + transactionDate + "&"
                 + Utils.TENANT_IDENTIFIER;
         final HashMap response = Utils.performServerGet(requestSpec, responseSpec, URL, "");
         return response;
@@ -2045,4 +2060,29 @@ public class LoanTransactionHelper extends IntegrationTest {
         return ok(fineract().loans.calculateLoanScheduleOrSubmitLoanApplication(request, command));
     }
 
+    public Integer createLoanProduct(final String inMultiplesOf, final String digitsAfterDecimal, final String repaymentStrategy,
+            final String accountingRule, final Account... accounts) {
+        log.info("------------------------------CREATING NEW LOAN PRODUCT ---------------------------------------");
+        final String loanProductJSON = new LoanProductTestBuilder().withPrincipal("10000000.00").withNumberOfRepayments("24")
+                .withRepaymentAfterEvery("1").withRepaymentTypeAsMonth().withinterestRatePerPeriod("2")
+                .withInterestRateFrequencyTypeAsMonths().withRepaymentStrategy(repaymentStrategy)
+                .withAmortizationTypeAsEqualPrincipalPayment().withInterestTypeAsDecliningBalance()
+                .currencyDetails(digitsAfterDecimal, inMultiplesOf).withAccounting(accountingRule, accounts).build(null);
+        return getLoanProductId(loanProductJSON);
+    }
+
+    public Integer applyForLoanApplicationWithPaymentStrategyAndPastMonth(final Integer clientID, final Integer loanProductID,
+            List<HashMap> charges, final String savingsId, String principal, final String repaymentStrategy, final String submittedOnDate,
+            final String disbursementDate) {
+        log.info("--------------------------------APPLYING FOR LOAN APPLICATION--------------------------------");
+
+        final String loanApplicationJSON = new LoanApplicationTestBuilder().withPrincipal(principal).withLoanTermFrequency("6")
+                .withLoanTermFrequencyAsMonths().withNumberOfRepayments("6").withRepaymentEveryAfter("1")
+                .withRepaymentFrequencyTypeAsMonths().withInterestRatePerPeriod("2").withAmortizationTypeAsEqualInstallments()
+                .withInterestTypeAsFlatBalance().withInterestCalculationPeriodTypeSameAsRepaymentPeriod()
+                .withExpectedDisbursementDate(disbursementDate).withSubmittedOnDate(submittedOnDate)
+                .withRepaymentStrategy(repaymentStrategy).withCharges(charges)
+                .build(clientID.toString(), loanProductID.toString(), savingsId);
+        return getLoanId(loanApplicationJSON);
+    }
 }

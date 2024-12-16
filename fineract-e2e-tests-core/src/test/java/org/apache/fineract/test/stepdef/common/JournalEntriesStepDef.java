@@ -59,6 +59,7 @@ public class JournalEntriesStepDef extends AbstractStepDef {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
+        String resourceId = String.valueOf(loanId);
 
         Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
         ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
@@ -67,7 +68,6 @@ public class JournalEntriesStepDef extends AbstractStepDef {
         String transactionTypeExpected = transactionType1.getValue();
 
         List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
-
         List<GetLoansLoanIdTransactions> transactionsMatch = transactions.stream()
                 .filter(t -> transactionDate.equals(formatter.format(t.getDate()))
                         && transactionTypeExpected.equals(t.getType().getCode().substring(20)))
@@ -133,7 +133,8 @@ public class JournalEntriesStepDef extends AbstractStepDef {
                 }
             }
             assertThat(containsAnyExpected)
-                    .as(ErrorMessageHelper.wrongValueInLineInJournalEntries(i, possibleActualValuesList, expectedValues)).isTrue();
+                    .as(ErrorMessageHelper.wrongValueInLineInJournalEntries(resourceId, i, possibleActualValuesList, expectedValues))
+                    .isTrue();
         }
     }
 
@@ -142,6 +143,7 @@ public class JournalEntriesStepDef extends AbstractStepDef {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
         Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
         long loanId = loanResponse.body().getLoanId();
+        String resourceId = String.valueOf(loanId);
 
         Response<GetLoansLoanIdResponse> loanDetailsResponse = loansApi.retrieveLoan(loanId, false, "transactions", "", "").execute();
         ErrorHelper.checkSuccessfulApiCall(loanDetailsResponse);
@@ -219,7 +221,8 @@ public class JournalEntriesStepDef extends AbstractStepDef {
                 }
             }
             assertThat(containsAnyExpected)
-                    .as(ErrorMessageHelper.wrongValueInLineInJournalEntries(i, possibleActualValuesList, expectedValues)).isTrue();
+                    .as(ErrorMessageHelper.wrongValueInLineInJournalEntries(resourceId, i, possibleActualValuesList, expectedValues))
+                    .isTrue();
         }
     }
 }

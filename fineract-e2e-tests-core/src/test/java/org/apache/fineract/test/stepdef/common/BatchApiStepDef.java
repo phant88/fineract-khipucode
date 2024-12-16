@@ -27,7 +27,6 @@ import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -65,7 +64,6 @@ import org.apache.fineract.client.services.ClientApi;
 import org.apache.fineract.client.services.LoansApi;
 import org.apache.fineract.client.services.UsersApi;
 import org.apache.fineract.client.util.JSON;
-import org.apache.fineract.test.api.ApiProperties;
 import org.apache.fineract.test.data.ChargeProductType;
 import org.apache.fineract.test.data.LoanRescheduleErrorMessage;
 import org.apache.fineract.test.data.LoanStatus;
@@ -75,6 +73,7 @@ import org.apache.fineract.test.factory.LoanRequestFactory;
 import org.apache.fineract.test.helper.ErrorHelper;
 import org.apache.fineract.test.helper.ErrorMessageHelper;
 import org.apache.fineract.test.helper.ErrorResponse;
+import org.apache.fineract.test.helper.Utils;
 import org.apache.fineract.test.messaging.EventAssertion;
 import org.apache.fineract.test.messaging.event.loan.LoanRescheduledDueAdjustScheduleEvent;
 import org.apache.fineract.test.stepdef.AbstractStepDef;
@@ -118,6 +117,7 @@ public class BatchApiStepDef extends AbstractStepDef {
     private static final Integer ERROR_HTTP_404 = 404;
     private static final String ERROR_DEVELOPER_MESSAGE_CLIENT = "Client with identifier null does not exist";
     private static final String ERROR_DEVELOPER_MESSAGE_LOAN_EXTERNAL = "Loan with external identifier {externalId} does not exist";
+    private static final String PWD_USER_WITH_ROLE = "1234567890Aa!";
 
     @Autowired
     private BatchApiApi batchApiApi;
@@ -139,9 +139,6 @@ public class BatchApiStepDef extends AbstractStepDef {
 
     @Autowired
     private UsersApi usersApi;
-
-    @Autowired
-    private ApiProperties apiProperties;
 
     @When("Batch API sample call ran")
     public void runSampleBatchApiCall() throws IOException {
@@ -175,7 +172,7 @@ public class BatchApiStepDef extends AbstractStepDef {
 
         // request 3 - charge Loan
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
-        String dateOfCharge = formatter.format(LocalDate.now(Clock.systemUTC()).minusMonths(1L).plusDays(1L));
+        String dateOfCharge = formatter.format(Utils.now().minusMonths(1L).plusDays(1L));
 
         PostLoansLoanIdChargesRequest loanIdChargesRequest = new PostLoansLoanIdChargesRequest();
         loanIdChargesRequest.chargeId(CHARGE_ID_NFS_FEE);
@@ -448,11 +445,11 @@ public class BatchApiStepDef extends AbstractStepDef {
         testContext().set(TestContextKey.BATCH_API_CALL_RESPONSE, batchResponseList);
         testContext().set(TestContextKey.BATCH_API_CALL_IDEMPOTENCY_KEY, idempotencyKey);
         eventAssertion.assertEvent(LoanRescheduledDueAdjustScheduleEvent.class, loanId).extractingData(loanAccountDataV1 -> {
-            Optional<LoanSchedulePeriodDataV1> period = loanAccountDataV1.getRepaymentSchedule().getPeriods().stream()
-                    .filter(p -> formatter.format(LocalDate.parse(p.getDueDate())).equals(toDateStr)).findFirst();
+            LoanSchedulePeriodDataV1 period = loanAccountDataV1.getRepaymentSchedule().getPeriods().stream()
+                    .filter(p -> formatter.format(LocalDate.parse(p.getDueDate())).equals(toDateStr)).findFirst().orElse(null);
             String dueDate = "";
-            if (period.isPresent()) {
-                dueDate = formatter.format(LocalDate.parse(period.get().getDueDate()));
+            if (period != null) {
+                dueDate = formatter.format(LocalDate.parse(period.getDueDate()));
             }
             assertThat(dueDate).as(ErrorMessageHelper.wrongDataInLastPaymentAmount(dueDate, toDateStr)).isEqualTo(toDateStr);
             return null;
@@ -473,7 +470,7 @@ public class BatchApiStepDef extends AbstractStepDef {
         Long createdUserId = createUserResponse.body().getResourceId();
         Response<GetUsersUserIdResponse> user = usersApi.retrieveOne31(createdUserId).execute();
         ErrorHelper.checkSuccessfulApiCall(user);
-        String authorizationString = user.body().getUsername() + ":" + apiProperties.getPassword();
+        String authorizationString = user.body().getUsername() + ":" + PWD_USER_WITH_ROLE;
         Base64 base64 = new Base64();
         headerMap.put("Authorization",
                 "Basic " + new String(base64.encode(authorizationString.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8));
@@ -488,11 +485,11 @@ public class BatchApiStepDef extends AbstractStepDef {
                 .execute();
 
         if (batchResponseList.errorBody() != null) {
-            log.info("ERROR: {}", batchResponseList.errorBody().string());
+            log.debug("ERROR: {}", batchResponseList.errorBody().string());
 
         }
         if (batchResponseList.body() != null) {
-            log.info("Body: {}", batchResponseList.body());
+            log.debug("Body: {}", batchResponseList.body());
         }
 
         testContext().set(TestContextKey.BATCH_API_CALL_RESPONSE, batchResponseList);
@@ -533,7 +530,7 @@ public class BatchApiStepDef extends AbstractStepDef {
         Long createdUserId = createUserResponse.body().getResourceId();
         Response<GetUsersUserIdResponse> user = usersApi.retrieveOne31(createdUserId).execute();
         ErrorHelper.checkSuccessfulApiCall(user);
-        String authorizationString = user.body().getUsername() + ":" + apiProperties.getPassword();
+        String authorizationString = user.body().getUsername() + ":" + PWD_USER_WITH_ROLE;
         Base64 base64 = new Base64();
         headerMap.put("Authorization",
                 "Basic " + new String(base64.encode(authorizationString.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8));
@@ -554,8 +551,46 @@ public class BatchApiStepDef extends AbstractStepDef {
         assertThat(errorMessageActual).as(ErrorMessageHelper.wrongErrorMessage(errorMessageActual, errorMessageExpected))
                 .isEqualTo(errorMessageExpected);
 
-        log.info("ERROR CODE: {}", errorCodeActual);
-        log.info("ERROR MESSAGE: {}", errorMessageActual);
+        log.debug("ERROR CODE: {}", errorCodeActual);
+        log.debug("ERROR MESSAGE: {}", errorMessageActual);
+    }
+
+    @When("Batch API call with created user and the following data results a {int} statuscode WITHOUT error message:")
+    public void runBatchApiCreateAndApproveLoanRescheduleWithGivenUserLockedByCobWithoutError(int httpCodeExpected, DataTable table)
+            throws IOException {
+        String idempotencyKey = UUID.randomUUID().toString();
+        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        Long loanId = loanResponse.body().getLoanId();
+
+        List<List<String>> data = table.asLists();
+        List<String> transferData = data.get(1);
+        String fromDateStr = transferData.get(0);
+        String submittedOnDate = transferData.get(1);
+        String toDateStr = transferData.get(2);
+        String approvedOnDate = transferData.get(3);
+        String enclosingTransaction = transferData.get(4);
+
+        Map<String, String> headerMap = new HashMap<>();
+
+        Response<PostUsersResponse> createUserResponse = testContext().get(TestContextKey.CREATED_SIMPLE_USER_RESPONSE);
+        Long createdUserId = createUserResponse.body().getResourceId();
+        Response<GetUsersUserIdResponse> user = usersApi.retrieveOne31(createdUserId).execute();
+        ErrorHelper.checkSuccessfulApiCall(user);
+        String authorizationString = user.body().getUsername() + ":" + PWD_USER_WITH_ROLE;
+        Base64 base64 = new Base64();
+        headerMap.put("Authorization",
+                "Basic " + new String(base64.encode(authorizationString.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8));
+        List<BatchRequest> requestList = new ArrayList<>();
+        requestList.add(createLoanReschedule(1L, loanId, fromDateStr, toDateStr, submittedOnDate, idempotencyKey, null));
+        requestList.add(approveLoanReschedule(2L, idempotencyKey, approvedOnDate, 1L));
+
+        Boolean isEnclosingTransaction = Boolean.valueOf(enclosingTransaction);
+        Response<List<BatchResponse>> batchResponseList = batchApiApi.handleBatchRequests(requestList, isEnclosingTransaction, headerMap)
+                .execute();
+        BatchResponse lastBatchResponse = batchResponseList.body().get(batchResponseList.body().size() - 1);
+        assertThat(httpCodeExpected).isEqualTo(lastBatchResponse.getStatusCode());
+        // No error
+        assertThat(batchResponseList.errorBody()).isEqualTo(null);
     }
 
     @When("Batch API call with steps: queryDatatable, updateDatatable runs, with empty queryDatatable response")
@@ -830,7 +865,9 @@ public class BatchApiStepDef extends AbstractStepDef {
         Integer statusIdActual = status.getId();
         Integer statusIdExpected = LoanStatus.APPROVED.value;
 
-        assertThat(statusIdActual).as(ErrorMessageHelper.wrongLoanStatus(statusIdActual, statusIdExpected)).isEqualTo(statusIdExpected);
+        String resourceId = String.valueOf(response.body().getId());
+        assertThat(statusIdActual).as(ErrorMessageHelper.wrongLoanStatus(resourceId, statusIdActual, statusIdExpected))
+                .isEqualTo(statusIdExpected);
     }
 
     @Then("Nr. {int} Client creation was rolled back")

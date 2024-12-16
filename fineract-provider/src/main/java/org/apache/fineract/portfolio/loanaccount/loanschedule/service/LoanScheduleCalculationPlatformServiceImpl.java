@@ -39,7 +39,6 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanLifecycleStateMachin
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTransactionProcessorFactory;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanSummaryWrapper;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.LoanRepaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanScheduleData;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.LoanSchedulePeriodData;
@@ -64,7 +63,6 @@ public class LoanScheduleCalculationPlatformServiceImpl implements LoanScheduleC
     private final LoanUtilService loanUtilService;
     private final LoanRepositoryWrapper loanRepository;
     private final LoanLifecycleStateMachine defaultLoanLifecycleStateMachine;
-    private final LoanSummaryWrapper loanSummaryWrapper;
 
     @Override
     public LoanScheduleModel calculateLoanSchedule(final JsonQuery query, Boolean validateParams) {
@@ -122,13 +120,7 @@ public class LoanScheduleCalculationPlatformServiceImpl implements LoanScheduleC
                 outstandingAmountsDTO.principal().getAmount(), outstandingAmountsDTO.interest().getAmount(),
                 outstandingAmountsDTO.feeCharges().getAmount(), outstandingAmountsDTO.penaltyCharges().getAmount(), false, null);
 
-        Money totalAmount = totalPrincipal.plus(loanRepaymentScheduleInstallment.getFeeChargesOutstanding(currency))
-                .plus(loanRepaymentScheduleInstallment.getPenaltyChargesOutstanding(currency));
-        Money interestDue = Money.zero(currency);
-        if (loanRepaymentScheduleInstallment.isInterestDue(currency)) {
-            interestDue = loanRepaymentScheduleInstallment.getInterestOutstanding(currency);
-            totalAmount = totalAmount.plus(interestDue);
-        }
+        Money interestDue = loanRepaymentScheduleInstallment.getInterestOutstanding(currency);
         boolean isNewPaymentRequired = loanRepaymentScheduleInstallment.isInterestDue(currency) || totalPrincipal.isGreaterThanZero();
 
         LoanScheduleModel model = this.loanScheduleAssembler.assembleForInterestRecalculation(loanApplicationTerms, loan.getOfficeId(),
@@ -141,14 +133,12 @@ public class LoanScheduleCalculationPlatformServiceImpl implements LoanScheduleC
                         periodData.getFromDate(), periodData.getDueDate(), totalPrincipal.getAmount(),
                         periodData.getPrincipalLoanBalanceOutstanding(), interestDue.getAmount(),
                         loanRepaymentScheduleInstallment.getFeeChargesCharged(currency).getAmount(),
-                        loanRepaymentScheduleInstallment.getPenaltyChargesCharged(currency).getAmount(), totalAmount.getAmount(),
-                        totalPrincipal.plus(interestDue).getAmount());
+                        loanRepaymentScheduleInstallment.getPenaltyChargesCharged(currency).getAmount());
                 futureInstallments.add(loanSchedulePeriodData);
                 isNewPaymentRequired = false;
             } else if (DateUtils.isAfter(periodData.getDueDate(), today)) {
                 futureInstallments.add(periodData);
             }
-
         }
         loanScheduleData.updateFuturePeriods(futureInstallments);
     }
@@ -198,8 +188,7 @@ public class LoanScheduleCalculationPlatformServiceImpl implements LoanScheduleC
             LoanSchedulePeriodData loanSchedulePeriodData = LoanSchedulePeriodData.repaymentOnlyPeriod(installment.getInstallmentNumber(),
                     installment.getFromDate(), installment.getDueDate(), installment.getPrincipal(currency).getAmount(),
                     outstanding.getAmount(), installment.getInterestCharged(currency).getAmount(),
-                    installment.getFeeChargesCharged(currency).getAmount(), installment.getPenaltyChargesCharged(currency).getAmount(),
-                    installment.getDue(currency).getAmount(), installment.getTotalPrincipalAndInterest(currency).getAmount());
+                    installment.getFeeChargesCharged(currency).getAmount(), installment.getPenaltyChargesCharged(currency).getAmount());
             installmentData.add(loanSchedulePeriodData);
             totalInterest = totalInterest.plus(installment.getInterestCharged(currency));
             totalCharge = totalCharge.plus(installment.getFeeChargesCharged(currency));
@@ -221,8 +210,7 @@ public class LoanScheduleCalculationPlatformServiceImpl implements LoanScheduleC
 
     private Loan fetchLoan(final Long accountId) {
         final Loan loanAccount = this.loanRepository.findOneWithNotFoundDetection(accountId, true);
-        loanAccount.setHelpers(defaultLoanLifecycleStateMachine, this.loanSummaryWrapper,
-                this.loanRepaymentScheduleTransactionProcessorFactory);
+        loanAccount.setHelpers(defaultLoanLifecycleStateMachine, this.loanRepaymentScheduleTransactionProcessorFactory);
 
         return loanAccount;
     }

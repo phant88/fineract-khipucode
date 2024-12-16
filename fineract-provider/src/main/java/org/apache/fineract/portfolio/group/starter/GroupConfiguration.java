@@ -57,6 +57,7 @@ import org.apache.fineract.portfolio.group.service.GroupRolesWritePlatformServic
 import org.apache.fineract.portfolio.group.service.GroupingTypesWritePlatformService;
 import org.apache.fineract.portfolio.group.service.GroupingTypesWritePlatformServiceJpaRepositoryImpl;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
+import org.apache.fineract.portfolio.loanaccount.service.LoanOfficerService;
 import org.apache.fineract.portfolio.note.domain.NoteRepository;
 import org.apache.fineract.portfolio.savings.domain.SavingsAccountRepositoryWrapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -90,14 +91,14 @@ public class GroupConfiguration {
             ConfigurationDomainService configurationDomainService, SavingsAccountRepositoryWrapper savingsAccountRepositoryWrapper,
             AccountNumberFormatRepositoryWrapper accountNumberFormatRepository, AccountNumberGenerator accountNumberGenerator,
             EntityDatatableChecksWritePlatformService entityDatatableChecksWritePlatformService,
-            BusinessEventNotifierService businessEventNotifierService
+            BusinessEventNotifierService businessEventNotifierService, LoanOfficerService loanOfficerService
 
     ) {
         return new GroupingTypesWritePlatformServiceJpaRepositoryImpl(context, groupRepository, clientRepositoryWrapper,
                 officeRepositoryWrapper, staffRepository, noteRepository, groupLevelRepository, fromApiJsonDeserializer,
                 loanRepositoryWrapper, codeValueRepository, commandProcessingService, calendarInstanceRepository,
                 configurationDomainService, savingsAccountRepositoryWrapper, accountNumberFormatRepository, accountNumberGenerator,
-                entityDatatableChecksWritePlatformService, businessEventNotifierService
+                entityDatatableChecksWritePlatformService, businessEventNotifierService, loanOfficerService
 
         );
     }

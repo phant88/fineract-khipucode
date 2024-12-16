@@ -198,6 +198,8 @@ final class LoanProductsApiResourceSwagger {
         public Boolean isCompoundingToBePostedAsTransaction;
         @Schema(example = "false")
         public Boolean allowCompoundingOnEod;
+        @Schema(example = "false")
+        public Boolean disallowInterestCalculationOnPastDue;
 
         // Accounting
         @Schema(example = "3")
@@ -246,6 +248,7 @@ final class LoanProductsApiResourceSwagger {
         public Long incomeFromGoodwillCreditPenaltyAccountId;
         public List<GetLoanProductsProductIdResponse.GetLoanPaymentChannelToFundSourceMappings> paymentChannelToFundSourceMappings;
         public List<GetLoanProductsProductIdResponse.GetLoanFeeToIncomeAccountMappings> feeToIncomeAccountMappings;
+        public List<GetLoanProductsProductIdResponse.GetChargeOffReasonsToExpenseMappings> chargeOffReasonsToExpenseMappings;
         public List<ChargeToGLAccountMapper> penaltyToIncomeAccountMappings;
 
         // Multi Disburse
@@ -320,6 +323,8 @@ final class LoanProductsApiResourceSwagger {
         }
 
         public List<String> supportedInterestRefundTypes;
+        @Schema(example = "REGULAR")
+        public String chargeOffBehaviour;
     }
 
     @Schema(description = "PostLoanProductsResponse")
@@ -517,6 +522,8 @@ final class LoanProductsApiResourceSwagger {
             public GetLoanProductsPreClosureInterestCalculationStrategy preClosureInterestCalculationStrategy;
             @Schema(example = "true")
             public Boolean isArrearsBasedOnOriginalSchedule;
+            @Schema(example = "false")
+            public Boolean disallowInterestCalculationOnPastDue;
             @Schema(example = "true")
             public Boolean isCompoundingToBePostedAsTransaction;
             @Schema(example = "true")
@@ -603,6 +610,7 @@ final class LoanProductsApiResourceSwagger {
         public Integer principalThresholdForLastInstalment;
         public GetLoanProductsResponse.GetLoanProductsRepaymentStartDateType repaymentStartDateType;
         public List<StringEnumOptionData> supportedInterestRefundTypes;
+        public StringEnumOptionData chargeOffBehaviour;
     }
 
     @Schema(description = "GetLoanProductsTemplateResponse")
@@ -1016,6 +1024,24 @@ final class LoanProductsApiResourceSwagger {
             public String description;
         }
 
+        static final class GetLoanProductsChargeOffReasonOptions {
+
+            private GetLoanProductsChargeOffReasonOptions() {}
+
+            @Schema(example = "2")
+            public Long id;
+            @Schema(example = "debit_card")
+            public String name;
+            @Schema(example = "2")
+            public Integer position;
+            @Schema(example = "Charge-Off reason description")
+            public String description;
+            @Schema(example = "true")
+            public Boolean active;
+            @Schema(example = "false")
+            public Boolean mandatory;
+        }
+
         @Schema(example = "false")
         public Boolean includeInBorrowerCycle;
         @Schema(example = "false")
@@ -1068,6 +1094,9 @@ final class LoanProductsApiResourceSwagger {
 
         public List<StringEnumOptionData> supportedInterestRefundTypes;
         public List<StringEnumOptionData> supportedInterestRefundTypesOptions;
+        public List<GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
+        public StringEnumOptionData chargeOffBehaviour;
+        public List<StringEnumOptionData> chargeOffBehaviourOptions;
     }
 
     @Schema(description = "GetLoanProductsProductIdResponse")
@@ -1190,6 +1219,16 @@ final class LoanProductsApiResourceSwagger {
             public Long fundSourceAccountId;
         }
 
+        static final class GetChargeOffReasonsToExpenseMappings {
+
+            private GetChargeOffReasonsToExpenseMappings() {}
+
+            @Schema(example = "1")
+            public Long chargeOffReasonCodeValueId;
+            @Schema(example = "12")
+            public Long expenseGLAccountId;
+        }
+
         static final class GetLoanFeeToIncomeAccountMappings {
 
             private GetLoanFeeToIncomeAccountMappings() {}
@@ -1300,6 +1339,7 @@ final class LoanProductsApiResourceSwagger {
         public GetLoanAccountingMappings accountingMappings;
         public Set<GetLoanPaymentChannelToFundSourceMappings> paymentChannelToFundSourceMappings;
         public Set<GetLoanFeeToIncomeAccountMappings> feeToIncomeAccountMappings;
+        public Set<GetChargeOffReasonsToExpenseMappings> chargeOffReasonsToExpenseMappings;
         @Schema(example = "false")
         public Boolean isRatesEnabled;
         @Schema(example = "true")
@@ -1342,6 +1382,8 @@ final class LoanProductsApiResourceSwagger {
         @Schema(example = "false")
         public Boolean enableAccrualActivityPosting;
         public List<StringEnumOptionData> supportedInterestRefundTypes;
+        public List<GetLoanProductsTemplateResponse.GetLoanProductsChargeOffReasonOptions> chargeOffReasonOptions;
+        public StringEnumOptionData chargeOffBehaviour;
     }
 
     @Schema(description = "PutLoanProductsProductIdRequest")
@@ -1557,6 +1599,7 @@ final class LoanProductsApiResourceSwagger {
         public Long incomeFromChargeOffPenaltyAccountId;
         public List<GetLoanProductsProductIdResponse.GetLoanPaymentChannelToFundSourceMappings> paymentChannelToFundSourceMappings;
         public List<GetLoanProductsProductIdResponse.GetLoanFeeToIncomeAccountMappings> feeToIncomeAccountMappings;
+        public List<GetLoanProductsProductIdResponse.GetChargeOffReasonsToExpenseMappings> chargeOffReasonsToExpenseMappings;
         public List<ChargeToGLAccountMapper> penaltyToIncomeAccountMappings;
         @Schema(example = "false")
         public Boolean enableAccrualActivityPosting;
@@ -1634,6 +1677,8 @@ final class LoanProductsApiResourceSwagger {
         }
 
         public List<String> supportedInterestRefundTypes;
+        @Schema(example = "REGULAR")
+        public String chargeOffBehaviour;
     }
 
     public static final class AdvancedPaymentData {

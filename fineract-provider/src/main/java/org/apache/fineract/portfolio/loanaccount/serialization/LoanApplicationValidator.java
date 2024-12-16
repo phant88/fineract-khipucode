@@ -95,7 +95,6 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanLifecycleStateMachin
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTransactionProcessorFactory;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanSummaryWrapper;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.impl.AdvancedPaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.exception.ExceedingTrancheCountException;
@@ -195,7 +194,6 @@ public final class LoanApplicationValidator {
     private final HolidayRepository holidayRepository;
     private final SavingsAccountRepositoryWrapper savingsAccountRepository;
     private final LoanLifecycleStateMachine defaultLoanLifecycleStateMachine;
-    private final LoanSummaryWrapper loanSummaryWrapper;
     private final CalendarInstanceRepository calendarInstanceRepository;
     private final LoanUtilService loanUtilService;
     private final EntityDatatableChecksWritePlatformService entityDatatableChecksWritePlatformService;
@@ -635,7 +633,8 @@ public final class LoanApplicationValidator {
                                     "error.msg.loan.loanIdToClose.no.active.loan.associated.to.client.found",
                                     "loanIdToClose is invalid, No Active Loan associated with the given Client ID found.");
                         }
-                        if (loanToClose.isMultiDisburmentLoan() && !loanToClose.isInterestRecalculationEnabledForProduct()) {
+                        if (loanToClose.isMultiDisburmentLoan()
+                                && !loanToClose.getLoanProductRelatedDetail().isInterestRecalculationEnabled()) {
                             throw new GeneralPlatformDomainRuleException(
                                     "error.msg.loan.topup.on.multi.tranche.loan.without.interest.recalculation.not.supported",
                                     "Topup on loan with multi-tranche disbursal and without interest recalculation is not supported.");
@@ -1346,7 +1345,8 @@ public final class LoanApplicationValidator {
                                 "error.msg.loan.loanIdToClose.no.active.loan.associated.to.client.found",
                                 "loanIdToClose is invalid, No Active Loan associated with the given Client ID found.");
                     }
-                    if (loanToClose.isMultiDisburmentLoan() && !loanToClose.isInterestRecalculationEnabledForProduct()) {
+                    if (loanToClose.isMultiDisburmentLoan()
+                            && !loanToClose.getLoanProductRelatedDetail().isInterestRecalculationEnabled()) {
                         throw new GeneralPlatformDomainRuleException(
                                 "error.msg.loan.topup.on.multi.tranche.loan.without.interest.recalculation.not.supported",
                                 "Topup on loan with multi-tranche disbursal and without interest recalculation is not supported.");
@@ -1985,8 +1985,7 @@ public final class LoanApplicationValidator {
             baseDataValidator.reset().parameter(LoanApiConstants.noteParameterName).value(note).notExceedingLengthOf(1000);
 
             final Loan loan = this.loanRepositoryWrapper.findOneWithNotFoundDetection(loanId, true);
-            loan.setHelpers(defaultLoanLifecycleStateMachine, this.loanSummaryWrapper,
-                    this.loanRepaymentScheduleTransactionProcessorFactory);
+            loan.setHelpers(defaultLoanLifecycleStateMachine, this.loanRepaymentScheduleTransactionProcessorFactory);
 
             final Client client = loan.client();
             if (client != null && client.isNotActive()) {
@@ -2104,7 +2103,7 @@ public final class LoanApplicationValidator {
         }
     }
 
-    private BigDecimal getOverAppliedMax(Loan loan) {
+    public BigDecimal getOverAppliedMax(Loan loan) {
         LoanProduct loanProduct = loan.getLoanProduct();
         if ("percentage".equals(loanProduct.getOverAppliedCalculationType())) {
             BigDecimal overAppliedNumber = BigDecimal.valueOf(loanProduct.getOverAppliedNumber());

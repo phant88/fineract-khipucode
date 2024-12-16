@@ -79,12 +79,12 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTra
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepository;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepositoryWrapper;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanSummaryWrapper;
 import org.apache.fineract.portfolio.loanaccount.exception.LoanApplicationNotInSubmittedAndPendingApprovalStateCannotBeDeleted;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanApplicationTerms;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.service.LoanScheduleAssembler;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanApplicationTransitionValidator;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanApplicationValidator;
+import org.apache.fineract.portfolio.loanaccount.serialization.LoanDownPaymentTransactionValidator;
 import org.apache.fineract.portfolio.loanproduct.LoanProductConstants;
 import org.apache.fineract.portfolio.loanproduct.domain.RecalculationFrequencyType;
 import org.apache.fineract.portfolio.note.domain.Note;
@@ -108,7 +108,6 @@ public class LoanApplicationWritePlatformServiceJpaRepositoryImpl implements Loa
     private final LoanRepositoryWrapper loanRepositoryWrapper;
     private final NoteRepository noteRepository;
     private final LoanAssembler loanAssembler;
-    private final LoanSummaryWrapper loanSummaryWrapper;
     private final LoanRepaymentScheduleTransactionProcessorFactory loanRepaymentScheduleTransactionProcessorFactory;
     private final CalendarRepository calendarRepository;
     private final CalendarInstanceRepository calendarInstanceRepository;
@@ -124,6 +123,8 @@ public class LoanApplicationWritePlatformServiceJpaRepositoryImpl implements Loa
     private final GSIMReadPlatformService gsimReadPlatformService;
     private final LoanLifecycleStateMachine defaultLoanLifecycleStateMachine;
     private final LoanAccrualsProcessingService loanAccrualsProcessingService;
+    private final LoanDownPaymentTransactionValidator loanDownPaymentTransactionValidator;
+    private final LoanScheduleService loanScheduleService;
 
     @Transactional
     @Override
@@ -615,6 +616,7 @@ public class LoanApplicationWritePlatformServiceJpaRepositoryImpl implements Loa
         Loan loan = retrieveLoanBy(loanId);
         loanApplicationTransitionValidator.checkClientOrGroupActive(loan);
 
+        loanDownPaymentTransactionValidator.validateAccountStatus(loan, LoanEvent.LOAN_APPROVAL_UNDO);
         final Map<String, Object> changes = loan.undoApproval(defaultLoanLifecycleStateMachine);
         if (!changes.isEmpty()) {
 
@@ -625,7 +627,7 @@ public class LoanApplicationWritePlatformServiceJpaRepositoryImpl implements Loa
                     || changes.containsKey(LoanApiConstants.disbursementPrincipalParameterName)) {
                 LocalDate recalculateFrom = null;
                 ScheduleGeneratorDTO scheduleGeneratorDTO = this.loanUtilService.buildScheduleGeneratorDTO(loan, recalculateFrom);
-                loan.regenerateRepaymentSchedule(scheduleGeneratorDTO);
+                loanScheduleService.regenerateRepaymentSchedule(loan, scheduleGeneratorDTO);
                 loanAccrualsProcessingService.reprocessExistingAccruals(loan);
             }
 
@@ -763,7 +765,7 @@ public class LoanApplicationWritePlatformServiceJpaRepositoryImpl implements Loa
 
     private Loan retrieveLoanBy(final Long loanId) {
         final Loan loan = this.loanRepositoryWrapper.findOneWithNotFoundDetection(loanId, true);
-        loan.setHelpers(defaultLoanLifecycleStateMachine, this.loanSummaryWrapper, this.loanRepaymentScheduleTransactionProcessorFactory);
+        loan.setHelpers(defaultLoanLifecycleStateMachine, this.loanRepaymentScheduleTransactionProcessorFactory);
         return loan;
     }
 

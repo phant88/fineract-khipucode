@@ -48,7 +48,6 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -2617,7 +2616,6 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
 
             ArrayList<HashMap> loanTransactionDetails = LOAN_TRANSACTION_HELPER.getLoanTransactionDetails(REQUEST_SPEC, RESPONSE_SPEC,
                     loanID);
-            validateAccrualTransactionForDisbursementCharge(loanTransactionDetails);
             final JournalEntry[] assetAccountInitialEntry = {
                     new JournalEntry(Float.parseFloat("120.00"), JournalEntry.TransactionType.DEBIT),
                     new JournalEntry(Float.parseFloat("12000.00"), JournalEntry.TransactionType.CREDIT),
@@ -3118,6 +3116,94 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
         loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(REQUEST_SPEC, RESPONSE_SPEC, loanID);
         LoanStatusChecker.verifyLoanAccountIsClosed(loanStatusHashMap);
 
+    }
+
+    @Test
+    public void testLoanPrePaymentWithMultiplePayments() {
+        final Integer clientID = ClientHelper.createClient(REQUEST_SPEC, RESPONSE_SPEC);
+        ClientHelper.verifyClientCreatedOnServer(REQUEST_SPEC, RESPONSE_SPEC, clientID);
+
+        // Create a loan product
+        Integer loanProductId = createLoanProduct(false, NONE);
+        Integer collateralId = CollateralManagementHelper.createCollateralProduct(REQUEST_SPEC, RESPONSE_SPEC);
+        Integer clientCollateralId = CollateralManagementHelper.createClientCollateral(REQUEST_SPEC, RESPONSE_SPEC,
+                String.valueOf(clientID), collateralId);
+        List<HashMap> collaterals = List.of(collaterals(clientCollateralId, BigDecimal.ONE));
+
+        // Apply for a loan
+        final String disbursementDate = "1 May 2023";
+        final String approvalDate = "1 April 2023";
+        final String submissionDate = "1 March 2023";
+        final String interestRate = "7";
+        final Integer loanID = applyForLoanApplication(clientID, loanProductId, disbursementDate, submissionDate, interestRate, null, null,
+                "1000", collaterals);
+        Assertions.assertNotNull(loanID);
+
+        // Check loan status
+        HashMap loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+        LoanStatusChecker.verifyLoanIsPending(loanStatusHashMap);
+
+        // Approve the loan
+        LOG.info("-----------------------------------APPROVE LOAN-----------------------------------------");
+        loanStatusHashMap = LOAN_TRANSACTION_HELPER.approveLoan(approvalDate, loanID);
+        LoanStatusChecker.verifyLoanIsApproved(loanStatusHashMap);
+        LoanStatusChecker.verifyLoanIsWaitingForDisbursal(loanStatusHashMap);
+
+        // Disburse the loan
+        LOG.info("-------------------------------DISBURSE LOAN-------------------------------------------");
+        String loanDetails = LOAN_TRANSACTION_HELPER.getLoanDetails(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+        loanStatusHashMap = LOAN_TRANSACTION_HELPER.disburseLoanWithNetDisbursalAmount(disbursementDate, loanID,
+                JsonPath.from(loanDetails).get("netDisbursalAmount").toString());
+        LoanStatusChecker.verifyLoanIsActive(loanStatusHashMap);
+
+        // Make the first partial repayment
+        LOG.info("------------------------MAKE FIRST PARTIAL REPAYMENT-----------------------------------");
+        Float firstRepaymentAmount = 500.0f; // First partial repayment
+        String firstRepaymentDate = "1 June 2023";
+        LOAN_TRANSACTION_HELPER.makeRepayment(firstRepaymentDate, firstRepaymentAmount, loanID);
+
+        // Verify the prepayment amount after the first partial repayment
+        LOG.info("------------------------GET PREPAYMENT AMOUNT AFTER FIRST PAYMENT-----------------------");
+        HashMap<String, Object> prepayAmount = loanTransactionHelper.getPrepayAmount(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+        Assertions.assertNotNull(prepayAmount);
+
+        // Extract the principal and interest portions
+        Float totalPrepayAmount = (Float) prepayAmount.get("amount");
+        Float principalAmount = (Float) prepayAmount.get("principalPortion");
+        Float interestAmount = (Float) prepayAmount.get("interestPortion");
+
+        // Expected values after the first partial repayment
+        Float expectedTotalPrepayAmount = 606.18f;
+        Float expectedPrincipal = 570.0f;
+        Float expectedInterest = 36.18f;
+
+        // Validate calculations
+        validateNumberForEqual(String.valueOf(expectedTotalPrepayAmount), String.valueOf(totalPrepayAmount));
+        validateNumberForEqual(String.valueOf(expectedPrincipal), String.valueOf(principalAmount));
+        validateNumberForEqual(String.valueOf(expectedInterest), String.valueOf(interestAmount));
+
+        // Make the second partial repayment
+        LOG.info("------------------------MAKE SECOND PARTIAL REPAYMENT----------------------------------");
+        Float secondRepaymentAmount = 606.18f;
+        String secondRepaymentDate = "1 July 2023";
+        LOAN_TRANSACTION_HELPER.makeRepayment(secondRepaymentDate, secondRepaymentAmount, loanID);
+
+        // Recheck the prepayment amount
+        LOG.info("------------------------RECHECK PREPAYMENT AMOUNT AFTER FULL REPAYMENT------------------");
+        HashMap<String, Object> postPrepayAmount = loanTransactionHelper.getPrepayAmount(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+        Assertions.assertNotNull(postPrepayAmount);
+
+        // Verify that the principal and interest portions are zero
+        Float postPrincipalAmount = (Float) postPrepayAmount.get("principalPortion");
+        Float postInterestAmount = (Float) postPrepayAmount.get("interestPortion");
+
+        validateNumberForEqual("0.0", String.valueOf(postPrincipalAmount));
+        validateNumberForEqual("0.0", String.valueOf(postInterestAmount));
+
+        // Check the loan status after repayment
+        LOG.info("------------------------CHECK LOAN STATUS---------------------------------------------");
+        loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+        LoanStatusChecker.verifyLoanAccountIsClosed(loanStatusHashMap);
     }
 
     @Test
@@ -5059,7 +5145,8 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
             for (int i = 1; i < loanSchedule.size(); i++) {
 
                 retrieveDueDate = dateFormat.format(repaymentDate.getTime());
-                amount = (Float) loanSchedule.get(i).get("principalOriginalDue") + (Float) loanSchedule.get(i).get("interestOriginalDue");
+                amount = ((Number) loanSchedule.get(i).get("principalOriginalDue")).floatValue()
+                        + ((Number) loanSchedule.get(i).get("interestOriginalDue")).floatValue();
                 if (currentDate.after(repaymentDate)) {
                     LOAN_TRANSACTION_HELPER.makeRepayment(retrieveDueDate, amount, loanID);
                 } else {
@@ -6276,7 +6363,15 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
                                 .locale("en").dateFormat(DATETIME_PATTERN));
             });
             assertEquals(403, exception.getResponse().code());
-            assertTrue(exception.getMessage().contains("error.msg.transaction.date.cannot.be.earlier.than.charge.off.date"));
+            assertTrue(exception.getMessage().contains("error.msg.loan.disbursal.not.allowed.on.charged.off"));
+
+            exception = assertThrows(CallFailedRuntimeException.class, () -> {
+                errorLoanTransactionHelper.disburseLoan((long) loanID,
+                        new PostLoansLoanIdRequest().actualDisbursementDate("7 September 2022").transactionAmount(new BigDecimal("10"))
+                                .locale("en").dateFormat(DATETIME_PATTERN));
+            });
+            assertEquals(403, exception.getResponse().code());
+            assertTrue(exception.getMessage().contains("error.msg.loan.disbursal.not.allowed.on.charged.off"));
 
             LOAN_TRANSACTION_HELPER.makeLoanRepayment((long) loanID, new PostLoansLoanIdTransactionsRequest().dateFormat(DATETIME_PATTERN)
                     .transactionDate("07 September 2022").locale("en").transactionAmount(5000.0));
@@ -7219,6 +7314,19 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
         return LOAN_TRANSACTION_HELPER.getLoanId(loanApplicationJSON);
     }
 
+    private Integer applyForLoanApplication(final Integer clientID, final Integer loanProductID, String disbursementDate,
+            String submissionDate, String interestRate, List<HashMap> charges, final String savingsId, String principal,
+            List<HashMap> collaterals) {
+        LOG.info("--------------------------------APPLYING FOR LOAN APPLICATION--------------------------------");
+        final String loanApplicationJSON = new LoanApplicationTestBuilder().withPrincipal(principal).withLoanTermFrequency("2")
+                .withLoanTermFrequencyAsMonths().withNumberOfRepayments("2").withRepaymentEveryAfter("1")
+                .withRepaymentFrequencyTypeAsMonths().withInterestRatePerPeriod(interestRate).withAmortizationTypeAsEqualInstallments()
+                .withInterestTypeAsDecliningBalance().withInterestCalculationPeriodTypeSameAsRepaymentPeriod()
+                .withExpectedDisbursementDate(disbursementDate).withSubmittedOnDate(submissionDate).withCollaterals(collaterals)
+                .withCharges(charges).build(clientID.toString(), loanProductID.toString(), savingsId);
+        return LOAN_TRANSACTION_HELPER.getLoanId(loanApplicationJSON);
+    }
+
     private Integer applyForLoanApplicationWithExternalId(RequestSpecification requestSpecification,
             ResponseSpecification responseSpecification, final Integer clientID, final Integer loanProductID, String principal,
             final String externalId) {
@@ -7598,17 +7706,6 @@ public class ClientLoanIntegrationTest extends BaseLoanIntegrationTest {
         LOAN_TRANSACTION_HELPER.makeRepayment(loanRepaymentDate, Float.parseFloat(prepayAmount), loanID);
         loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(REQUEST_SPEC, RESPONSE_SPEC, loanID);
         LoanStatusChecker.verifyLoanAccountIsClosed(loanStatusHashMap);
-    }
-
-    private void validateAccrualTransactionForDisbursementCharge(ArrayList<HashMap> loanTransactionDetails) {
-        List<HashMap> disbursementTransactions = loanTransactionDetails.stream()
-                .filter(transactionDetail -> (Boolean) ((LinkedHashMap) transactionDetail.get("type")).get("repaymentAtDisbursement"))
-                .toList();
-        List<HashMap> accrualTransactions = loanTransactionDetails.stream()
-                .filter(transactionDetail -> (Boolean) ((LinkedHashMap) transactionDetail.get("type")).get("accrual")).toList();
-        assertEquals(disbursementTransactions.size(), accrualTransactions.size(), 1);
-        assertEquals((Float) disbursementTransactions.get(0).get("amount"), (Float) accrualTransactions.get(0).get("amount"));
-        assertTrue(StringUtils.isNotBlank((String) accrualTransactions.get(0).get("externalId")));
     }
 
     private void addRepaymentValues(List<Map<String, Object>> expectedvalues, Calendar todaysDate, int addPeriod, boolean isAddDays,

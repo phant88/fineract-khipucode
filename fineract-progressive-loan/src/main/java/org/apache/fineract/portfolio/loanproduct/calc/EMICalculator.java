@@ -18,25 +18,33 @@
  */
 package org.apache.fineract.portfolio.loanproduct.calc;
 
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.PayableDetails;
+import org.apache.fineract.portfolio.loanaccount.loanschedule.data.OutstandingDetails;
+import org.apache.fineract.portfolio.loanaccount.loanschedule.data.PeriodDueDetails;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.ProgressiveLoanInterestScheduleModel;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.data.RepaymentPeriod;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleModelRepaymentPeriod;
-import org.apache.fineract.portfolio.loanproduct.domain.LoanProductRelatedDetail;
+import org.apache.fineract.portfolio.loanproduct.domain.LoanProductMinimumRepaymentScheduleRelatedDetail;
 
 public interface EMICalculator {
 
-    ProgressiveLoanInterestScheduleModel generateInterestScheduleModel(List<LoanScheduleModelRepaymentPeriod> periods,
-            LoanProductRelatedDetail loanProductRelatedDetail, Integer installmentAmountInMultiplesOf);
+    @NotNull
+    ProgressiveLoanInterestScheduleModel generatePeriodInterestScheduleModel(@NotNull List<LoanScheduleModelRepaymentPeriod> periods,
+            @NotNull LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail, Integer installmentAmountInMultiplesOf,
+            MathContext mc);
 
-    ProgressiveLoanInterestScheduleModel generateModel(LoanProductRelatedDetail loanProductRelatedDetail,
-            Integer installmentAmountInMultiplesOf, List<LoanRepaymentScheduleInstallment> repaymentPeriods);
+    @NotNull
+    ProgressiveLoanInterestScheduleModel generateInstallmentInterestScheduleModel(
+            @NotNull List<LoanRepaymentScheduleInstallment> installments,
+            @NotNull LoanProductMinimumRepaymentScheduleRelatedDetail loanProductRelatedDetail, Integer installmentAmountInMultiplesOf,
+            MathContext mc);
 
     Optional<RepaymentPeriod> findRepaymentPeriod(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate dueDate);
 
@@ -54,8 +62,18 @@ public interface EMICalculator {
     void payPrincipal(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate repaymentPeriodDueDate, LocalDate transactionDate,
             Money principalAmount);
 
-    PayableDetails getPayableDetails(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate periodDueDate, LocalDate payDate);
+    @NotNull
+    PeriodDueDetails getDueAmounts(@NotNull ProgressiveLoanInterestScheduleModel scheduleModel, @NotNull LocalDate periodDueDate,
+            @NotNull LocalDate targetDate);
 
-    Money getOutstandingLoanBalance(ProgressiveLoanInterestScheduleModel interestScheduleModel, LocalDate repaymentPeriodDueDate,
+    @NotNull
+    Money getPeriodInterestTillDate(@NotNull ProgressiveLoanInterestScheduleModel scheduleModel, @NotNull LocalDate periodDueDate,
+            @NotNull LocalDate targetDate);
+
+    Money getOutstandingLoanBalanceOfPeriod(ProgressiveLoanInterestScheduleModel interestScheduleModel, LocalDate repaymentPeriodDueDate,
             LocalDate targetDate);
+
+    OutstandingDetails getOutstandingAmountsTillDate(ProgressiveLoanInterestScheduleModel model, LocalDate targetDate);
+
+    Money getSumOfDueInterestsOnDate(ProgressiveLoanInterestScheduleModel scheduleModel, LocalDate subjectDate);
 }

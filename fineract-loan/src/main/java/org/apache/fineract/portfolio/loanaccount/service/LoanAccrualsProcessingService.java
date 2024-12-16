@@ -18,30 +18,31 @@
  */
 package org.apache.fineract.portfolio.loanaccount.service;
 
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
-import java.util.Collection;
+import java.util.List;
 import org.apache.fineract.infrastructure.core.exception.MultiException;
-import org.apache.fineract.portfolio.loanaccount.data.LoanScheduleAccrualData;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 
 public interface LoanAccrualsProcessingService {
 
-    void addPeriodicAccruals(LocalDate tilldate) throws MultiException;
+    void addPeriodicAccruals(@NotNull LocalDate tilldate) throws MultiException;
 
-    void addPeriodicAccruals(LocalDate tilldate, Loan loan) throws MultiException;
+    void addPeriodicAccruals(@NotNull LocalDate tilldate, @NotNull Loan loan) throws MultiException;
 
-    void addAccrualAccounting(Long loanId, Collection<LoanScheduleAccrualData> loanScheduleAccrualDatas) throws Exception;
+    void addAccruals(@NotNull LocalDate tilldate) throws MultiException;
 
-    void addIncomeAndAccrualTransactions(Long loanId) throws Exception;
+    void reprocessExistingAccruals(@NotNull Loan loan);
 
-    void reprocessExistingAccruals(Loan loan);
+    void processAccrualsOnInterestRecalculation(@NotNull Loan loan, boolean isInterestRecalculationEnabled, boolean addJournal);
 
-    void processAccrualsForInterestRecalculation(Loan loan, boolean isInterestRecalculationEnabled);
+    void addIncomePostingAndAccruals(Long loanId) throws Exception;
 
-    void processIncomePostingAndAccruals(Loan loan);
+    void processIncomePostingAndAccruals(@NotNull Loan loan);
 
-    void processAccrualsForLoanClosure(Loan loan);
+    void processAccrualsOnLoanClosure(@NotNull Loan loan);
 
-    void processAccrualsForLoanForeClosure(Loan loan, LocalDate foreClosureDate, Collection<LoanTransaction> newAccrualTransactions);
+    void processAccrualsOnLoanForeClosure(@NotNull Loan loan, @NotNull LocalDate foreClosureDate,
+            @NotNull List<LoanTransaction> newAccrualTransactions);
 }
