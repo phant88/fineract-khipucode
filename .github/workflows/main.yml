@@ -1,5 +1,3 @@
-name: Despliegue con Docker Compose
-
 #on:
 #  push:
 #    branches:
