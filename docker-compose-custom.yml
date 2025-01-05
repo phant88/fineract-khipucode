@@ -26,6 +26,7 @@ services:
 
   fineract:
     extends:
+      container_name: fineract-provider
       file: ./config/docker/compose/fineract.yml
       service: fineract
     
