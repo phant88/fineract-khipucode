@@ -25,7 +25,8 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.annotation.Import;
-
+import javax.net.ssl.*;
+import java.security.cert.X509Certificate;
 /**
  * Fineract main() application which launches Fineract in an embedded Tomcat HTTP (using Spring Boot).
  *
@@ -54,6 +55,41 @@ public class ServerApplication extends SpringBootServletInitializer {
     }
 
     public static void main(String[] args) throws IOException {
+        // Deshabilitar la validación SSL
+        disableSSLValidation();
         configureApplication(new SpringApplicationBuilder(ServerApplication.class)).run(args);
+    }
+
+    public static void disableSSLValidation() {
+        try {
+            // TrustManager que acepta todos los certificados
+            TrustManager[] trustAllCerts = new TrustManager[]{
+                    new X509TrustManager() {
+                        @Override
+                        public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                        }
+
+                        @Override
+                        public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                        }
+
+                        @Override
+                        public X509Certificate[] getAcceptedIssuers() {
+                            return new X509Certificate[0];
+                        }
+                    }
+            };
+
+            // Configura el SSLContext para ignorar validaciones
+            SSLContext sc = SSLContext.getInstance("TLS");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+            // Deshabilitar la verificación del nombre del host
+            HostnameVerifier allHostsValid = (hostname, session) -> true;
+            HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
