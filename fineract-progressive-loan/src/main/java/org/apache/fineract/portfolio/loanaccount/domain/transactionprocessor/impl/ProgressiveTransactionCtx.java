@@ -43,6 +43,8 @@ public class ProgressiveTransactionCtx extends TransactionCtx {
     private List<LoanTransaction> alreadyProcessedTransactions = new ArrayList<>();
     @Setter
     private Money sumOfInterestRefundAmount;
+    @Setter
+    private boolean isChargedOff = false;
 
     public ProgressiveTransactionCtx(MonetaryCurrency currency, List<LoanRepaymentScheduleInstallment> installments,
             Set<LoanCharge> charges, MoneyHolder overpaymentHolder, ChangedTransactionDetail changedTransactionDetail,

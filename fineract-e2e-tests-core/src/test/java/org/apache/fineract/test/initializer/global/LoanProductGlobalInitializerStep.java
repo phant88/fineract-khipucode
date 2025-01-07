@@ -1094,17 +1094,56 @@ public class LoanProductGlobalInitializerStep implements FineractGlobalInitializ
         final String name51 = DefaultLoanProduct.LP2_ADV_PYMNT_INTEREST_DAILY_INTEREST_RECALCULATION_ZERO_INTEREST_CHARGE_OFF_BEHAVIOUR
                 .getName();
 
-        final PostLoanProductsRequest loanProductsRequestAdvCustomZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsRequestFactory
+        final PostLoanProductsRequest loanProductsRequestAdvInterestRecalculationZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsRequestFactory
                 .defaultLoanProductsRequestLP2InterestDailyRecalculation()//
                 .name(name51)//
                 .paymentAllocation(List.of(//
                         createPaymentAllocation("DEFAULT", "NEXT_INSTALLMENT")))
                 .chargeOffBehaviour("ZERO_INTEREST");//
-        final Response<PostLoanProductsResponse> responseLoanProductsRequestAdvCustomZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsApi
-                .createLoanProduct(loanProductsRequestAdvCustomZeroInterestChargeOffBehaviourProgressiveLoanSchedule).execute();
+        final Response<PostLoanProductsResponse> responseLoanProductsRequestAdvInterestRecalculationZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsApi
+                .createLoanProduct(loanProductsRequestAdvInterestRecalculationZeroInterestChargeOffBehaviourProgressiveLoanSchedule)
+                .execute();
         TestContext.INSTANCE.set(
                 TestContextKey.DEFAULT_LOAN_PRODUCT_CREATE_RESPONSE_LP2_ADV_PYMNT_INTEREST_DAILY_INTEREST_RECALCULATION_ZERO_INTEREST_CHARGE_OFF_BEHAVIOUR,
-                responseLoanProductsRequestAdvCustomZeroInterestChargeOffBehaviourProgressiveLoanSchedule);
+                responseLoanProductsRequestAdvInterestRecalculationZeroInterestChargeOffBehaviourProgressiveLoanSchedule);
+
+        // LP2 + zero-interest chargeOff behaviour + progressive loan schedule + horizontal
+        // (LP2_ADV_PYMNT_ZERO_INTEREST_CHARGE_OFF_BEHAVIOUR)
+        final String name52 = DefaultLoanProduct.LP2_ADV_PYMNT_ZERO_INTEREST_CHARGE_OFF_BEHAVIOUR.getName();
+
+        final PostLoanProductsRequest loanProductsRequestAdvZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsRequestFactory
+                .defaultLoanProductsRequestLP2()//
+                .name(name52)//
+                .enableDownPayment(false)//
+                .enableAutoRepaymentForDownPayment(null)//
+                .disbursedAmountPercentageForDownPayment(null)//
+                .transactionProcessingStrategyCode(ADVANCED_PAYMENT_ALLOCATION.getValue())//
+                .loanScheduleType("PROGRESSIVE") //
+                .loanScheduleProcessingType("HORIZONTAL")//
+                .interestRateFrequencyType(3)//
+                .maxInterestRatePerPeriod(10.0)//
+                .paymentAllocation(List.of(//
+                        createPaymentAllocation("DEFAULT", "NEXT_INSTALLMENT",
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.PAST_DUE_PENALTY, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.PAST_DUE_FEE, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.PAST_DUE_PRINCIPAL, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.PAST_DUE_INTEREST, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.DUE_PENALTY, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.DUE_FEE, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.DUE_PRINCIPAL, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.DUE_INTEREST, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.IN_ADVANCE_PENALTY, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.IN_ADVANCE_FEE,
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.IN_ADVANCE_INTEREST, //
+                                LoanProductPaymentAllocationRule.AllocationTypesEnum.IN_ADVANCE_PRINCIPAL), //
+                        createPaymentAllocation("GOODWILL_CREDIT", "LAST_INSTALLMENT"), //
+                        createPaymentAllocation("MERCHANT_ISSUED_REFUND", "REAMORTIZATION"), //
+                        createPaymentAllocation("PAYOUT_REFUND", "NEXT_INSTALLMENT")))//
+                .chargeOffBehaviour("ZERO_INTEREST");//
+        final Response<PostLoanProductsResponse> responseLoanProductsRequestAdvZeroInterestChargeOffBehaviourProgressiveLoanSchedule = loanProductsApi
+                .createLoanProduct(loanProductsRequestAdvZeroInterestChargeOffBehaviourProgressiveLoanSchedule).execute();
+        TestContext.INSTANCE.set(TestContextKey.DEFAULT_LOAN_PRODUCT_CREATE_RESPONSE_LP2_ADV_PYMNT_ZERO_INTEREST_CHARGE_OFF_BEHAVIOUR,
+                responseLoanProductsRequestAdvZeroInterestChargeOffBehaviourProgressiveLoanSchedule);
     }
 
     public static AdvancedPaymentData createPaymentAllocation(String transactionType, String futureInstallmentAllocationRule,
