@@ -521,13 +521,13 @@ public class AppUser extends AbstractPersistableCustom<Long> implements Platform
 
     public boolean hasNotPermissionForAnyOf(final String... permissionCodes) {
         boolean hasNotPermission = true;
-        for (final String permissionCode : permissionCodes) {
+        /*for (final String permissionCode : permissionCodes) {
             final boolean checkPermission = hasPermissionTo(permissionCode);
             if (checkPermission) {
                 hasNotPermission = false;
                 break;
             }
-        }
+        }*/
         return hasNotPermission;
     }
 
