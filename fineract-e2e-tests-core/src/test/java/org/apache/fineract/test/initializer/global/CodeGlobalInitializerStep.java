@@ -53,6 +53,9 @@ public class CodeGlobalInitializerStep implements FineractGlobalInitializerStep 
     public static final Long CODE_VALUE_FINANCIAL_INSTRUMENT_ID = 39L;
     public static final String CODE_VALUE_FINANCIAL_INSTRUMENT_DEBIT = "debit_card";
     public static final String CODE_VALUE_FINANCIAL_INSTRUMENT_CREDIT = "credit_card";
+    public static final String CODE_VALUE_FINANCIAL_INSTRUMENT_FRAUD = "Fraud";
+    public static final String CODE_VALUE_FINANCIAL_INSTRUMENT_DELINQUENT = "Delinquent";
+    public static final String CODE_VALUE_FINANCIAL_INSTRUMENT_OTHER = "Other";
     public static final Long CODE_VALUE_TRANSACTION_TYPE_ID = 40L;
     public static final String CODE_VALUE_TRANSACTION_TYPE_SCHEDULED_PAYMENT = "scheduled_payment";
     public static final Long CODE_VALUE_BANKRUPTCY_TAG_ID = 41L;
@@ -104,9 +107,12 @@ public class CodeGlobalInitializerStep implements FineractGlobalInitializerStep 
     public static final String CODE_VALUE_FAMILY_MARITAL_STATUS_WIDOWED = "Widowed";
     public static final Long CODE_VALUE_CONSTITUTION_ID = 24L;
     public static final String CODE_VALUE_CONSTITUTION_TEST = "Test";
-
     public static final Long CODE_VALUE_RESCHEDULE_REASON_ID = 23L;
     public static final String CODE_VALUE_RESCHEDULE_REASON_TEST = "Test";
+    public static final Long CODE_VALUE_WRITE_OFF_REASON_ID = 26L;
+    public static final String CODE_VALUE_WRITE_OFF_REASON_TEST_1 = "Bad Debt";
+    public static final String CODE_VALUE_WRITE_OFF_REASON_TEST_2 = "Forgiven";
+    public static final String CODE_VALUE_WRITE_OFF_REASON_TEST_3 = "Test";
 
     private final CodesApi codesApi;
     private final CodeValuesApi codeValuesApi;
@@ -138,6 +144,9 @@ public class CodeGlobalInitializerStep implements FineractGlobalInitializerStep 
         List<String> financialInstrumentNames = new ArrayList<>();
         financialInstrumentNames.add(CODE_VALUE_FINANCIAL_INSTRUMENT_DEBIT);
         financialInstrumentNames.add(CODE_VALUE_FINANCIAL_INSTRUMENT_CREDIT);
+        financialInstrumentNames.add(CODE_VALUE_FINANCIAL_INSTRUMENT_FRAUD);
+        financialInstrumentNames.add(CODE_VALUE_FINANCIAL_INSTRUMENT_DELINQUENT);
+        financialInstrumentNames.add(CODE_VALUE_FINANCIAL_INSTRUMENT_OTHER);
         createCodeValues(CODE_VALUE_FINANCIAL_INSTRUMENT_ID, financialInstrumentNames);
 
         // transaction type
@@ -240,6 +249,13 @@ public class CodeGlobalInitializerStep implements FineractGlobalInitializerStep 
         List<String> rescheduleReasonNames = new ArrayList<>();
         rescheduleReasonNames.add(CODE_VALUE_RESCHEDULE_REASON_TEST);
         createCodeValues(CODE_VALUE_RESCHEDULE_REASON_ID, rescheduleReasonNames);
+
+        // add Write-off reasons
+        List<String> writeOffReasonNames = new ArrayList<>();
+        writeOffReasonNames.add(CODE_VALUE_WRITE_OFF_REASON_TEST_1);
+        writeOffReasonNames.add(CODE_VALUE_WRITE_OFF_REASON_TEST_2);
+        writeOffReasonNames.add(CODE_VALUE_WRITE_OFF_REASON_TEST_3);
+        createCodeValues(CODE_VALUE_WRITE_OFF_REASON_ID, writeOffReasonNames);
     }
 
     public void createCodeValues(Long codeId, List<String> codeValueNames) {

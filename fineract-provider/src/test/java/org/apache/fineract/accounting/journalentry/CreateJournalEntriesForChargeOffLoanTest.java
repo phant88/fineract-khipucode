@@ -37,6 +37,7 @@ import org.apache.fineract.accounting.journalentry.service.AccountingProcessorHe
 import org.apache.fineract.accounting.journalentry.service.AccrualBasedAccountingProcessorForLoan;
 import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGLAccountMapping;
 import org.apache.fineract.organisation.office.domain.Office;
+import org.apache.fineract.portfolio.PortfolioProductType;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionEnumData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class CreateJournalEntriesForChargeOffLoanTest {
 
-    private static final Integer chargeOffReasons = 15;
+    private static final Long chargeOffReasonId = 15L;
 
     @Mock
     private AccountingProcessorHelper helper;
@@ -71,7 +72,8 @@ class CreateJournalEntriesForChargeOffLoanTest {
                 transactionType, new BigDecimal("500.00"), new BigDecimal("500.00"), null, null, null, null, false, Collections.emptyList(),
                 Collections.emptyList(), false, "", null, null, null, null);
 
-        loanDTO = new LoanDTO(1L, 1L, 1L, "USD", false, true, true, List.of(loanTransactionDTO), false, false, chargeOffReasons);
+        loanDTO = new LoanDTO(1L, 1L, 1L, "USD", false, true, true, List.of(loanTransactionDTO), false, false, chargeOffReasonId, false,
+                false, null, null, null);
     }
 
     @Test
@@ -84,7 +86,7 @@ class CreateJournalEntriesForChargeOffLoanTest {
         ProductToGLAccountMapping chargeToGLAccountMapper = new ProductToGLAccountMapping();
         chargeToGLAccountMapper.setGlAccount(chargeOffGLAccount);
 
-        when(helper.getChargeOffMappingByCodeValue(chargeOffReasons)).thenReturn(chargeToGLAccountMapper);
+        when(helper.getChargeOffMappingByCodeValue(1L, PortfolioProductType.LOAN, chargeOffReasonId)).thenReturn(chargeToGLAccountMapper);
 
         GLAccount loanPortfolioGLAccount = new GLAccount();
         loanPortfolioGLAccount.setId(20L);
@@ -96,21 +98,20 @@ class CreateJournalEntriesForChargeOffLoanTest {
 
         processor.createJournalEntriesForLoan(loanDTO);
 
-        verify(helper, times(1)).getChargeOffMappingByCodeValue(chargeOffReasons);
+        verify(helper, times(1)).getChargeOffMappingByCodeValue(1L, PortfolioProductType.LOAN, chargeOffReasonId);
         verify(helper, times(1)).getLinkedGLAccountForLoanProduct(1L, AccrualAccountsForLoan.LOAN_PORTFOLIO.getValue(), 1L);
-        verify(helper, times(1)).createCreditJournalEntryOrReversalForLoan(helper.getOfficeById(1L), "USD",
-                AccrualAccountsForLoan.LOAN_PORTFOLIO, 1L, null, 1L, "txn-123", LocalDate.now(ZoneId.systemDefault()),
-                new BigDecimal("500.00"), false);
-        verify(helper, times(1)).createDebitJournalEntryOrReversalForLoan(helper.getOfficeById(1L), "USD",
+        verify(helper, times(1)).createCreditJournalEntryForLoan(helper.getOfficeById(1L), "USD", AccrualAccountsForLoan.LOAN_PORTFOLIO, 1L,
+                null, 1L, "txn-123", LocalDate.now(ZoneId.systemDefault()), new BigDecimal("500.00"));
+        verify(helper, times(1)).createDebitJournalEntryForLoan(helper.getOfficeById(1L), "USD",
                 AccrualAccountsForLoan.CHARGE_OFF_EXPENSE.getValue(), 1L, null, 1L, "txn-123", LocalDate.now(ZoneId.systemDefault()),
-                new BigDecimal("500.00"), false);
+                new BigDecimal("500.00"));
     }
 
     @Test
     void shouldCreateJournalEntriesForChargeOffWithFraud() {
         loanDTO.setMarkedAsFraud(true);
 
-        when(helper.getChargeOffMappingByCodeValue(chargeOffReasons)).thenReturn(null);
+        when(helper.getChargeOffMappingByCodeValue(1L, PortfolioProductType.LOAN, chargeOffReasonId)).thenReturn(null);
 
         GLAccount loanPortfolioGLAccount = new GLAccount();
         loanPortfolioGLAccount.setId(20L);
@@ -138,7 +139,7 @@ class CreateJournalEntriesForChargeOffLoanTest {
     void shouldCreateJournalEntriesForChargeOffWithoutFraud() {
         loanDTO.setMarkedAsFraud(false);
 
-        when(helper.getChargeOffMappingByCodeValue(chargeOffReasons)).thenReturn(null);
+        when(helper.getChargeOffMappingByCodeValue(1L, PortfolioProductType.LOAN, chargeOffReasonId)).thenReturn(null);
 
         GLAccount loanPortfolioGLAccount = new GLAccount();
         loanPortfolioGLAccount.setId(20L);

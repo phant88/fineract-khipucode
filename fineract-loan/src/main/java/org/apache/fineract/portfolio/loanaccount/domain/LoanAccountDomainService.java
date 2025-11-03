@@ -74,12 +74,6 @@ public interface LoanAccountDomainService {
             boolean isRecoveryRepayment, String chargeRefundChargeType, boolean isAccountTransfer, HolidayDetailDTO holidayDetailDto,
             Boolean isHolidayValidationDone, boolean isLoanToLoanTransfer);
 
-    LoanTransaction saveLoanTransactionWithDataIntegrityViolationChecks(LoanTransaction newRepaymentTransaction);
-
-    Loan saveAndFlushLoanWithDataIntegrityViolationChecks(Loan loan);
-
-    Loan saveLoanWithDataIntegrityViolationChecks(Loan loan);
-
     LoanTransaction foreCloseLoan(Loan loan, LocalDate foreClourseDate, String noteText, ExternalId externalId,
             Map<String, Object> changes);
 
@@ -96,11 +90,14 @@ public interface LoanAccountDomainService {
 
     Pair<LoanTransaction, LoanTransaction> makeRefund(Loan loan, ScheduleGeneratorDTO scheduleGeneratorDTO,
             LoanTransactionType loanTransactionType, LocalDate transactionDate, BigDecimal transactionAmount, PaymentDetail paymentDetail,
-            ExternalId txnExternalId);
+            ExternalId txnExternalId, Boolean interestRefundCalculationOverride);
 
     void updateAndSavePostDatedChecksForIndividualAccount(Loan loan, LoanTransaction transaction);
 
     LoanTransaction applyInterestRefund(Loan loan, LoanRefundRequestData loanRefundRequest);
 
     void updateAndSaveLoanCollateralTransactionsForIndividualAccounts(Loan loan, LoanTransaction transaction);
+
+    LoanTransaction createManualInterestRefundWithAmount(Loan loan, LoanTransaction targetTransaction, BigDecimal amount,
+            PaymentDetail paymentDetail, ExternalId txnExternalId);
 }

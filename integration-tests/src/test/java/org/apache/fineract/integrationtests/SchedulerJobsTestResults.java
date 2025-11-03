@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.truth.Truth;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.builder.ResponseSpecBuilder;
 import io.restassured.http.ContentType;
@@ -50,7 +49,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TimeZone;
-import org.apache.fineract.client.models.BusinessDateRequest;
+import org.apache.fineract.client.models.BusinessDateUpdateRequest;
 import org.apache.fineract.client.models.GetJournalEntriesTransactionIdResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdResponse;
 import org.apache.fineract.client.models.JournalEntryTransactionItem;
@@ -60,6 +59,7 @@ import org.apache.fineract.client.models.PutGlobalConfigurationsRequest;
 import org.apache.fineract.client.models.PutJobsJobIDRequest;
 import org.apache.fineract.infrastructure.businessdate.domain.BusinessDateType;
 import org.apache.fineract.infrastructure.configuration.api.GlobalConfigurationConstants;
+import org.apache.fineract.integrationtests.client.IntegrationTest;
 import org.apache.fineract.integrationtests.common.BusinessDateHelper;
 import org.apache.fineract.integrationtests.common.BusinessStepHelper;
 import org.apache.fineract.integrationtests.common.ClientHelper;
@@ -101,7 +101,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @TestMethodOrder(MethodName.class)
 @ExtendWith(LoanTestLifecycleExtension.class)
 @SuppressWarnings({ "unchecked", "rawtypes" })
-public class SchedulerJobsTestResults {
+public class SchedulerJobsTestResults extends IntegrationTest {
 
     private static final String FROM_ACCOUNT_TYPE_SAVINGS = "2";
     private static final String TO_ACCOUNT_TYPE_SAVINGS = "2";
@@ -212,8 +212,7 @@ public class SchedulerJobsTestResults {
                     annualFeeDueDateAsArrayList.get(2));
             LocalDate expectedDueDate = LocalDate.of(2023, 1, 15);
 
-            Truth.assertWithMessage("Verifying that all due Annual Fees have been paid").that(nextDueDateForAnnualFee)
-                    .isEquivalentAccordingToCompareTo(expectedDueDate);
+            assertThat(nextDueDateForAnnualFee).isEqualTo(expectedDueDate);
         } finally {
             savingsAccountHelper.closeSavingsAccountOnDate(savingsId, "true", "11 November 2022");
             globalConfigurationHelper.updateGlobalConfiguration(GlobalConfigurationConstants.ENABLE_BUSINESS_DATE,
@@ -845,7 +844,7 @@ public class SchedulerJobsTestResults {
         ArrayList<HashMap> repaymentScheduleDataAfter = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, responseSpec,
                 loanID);
 
-        Assertions.assertEquals(0, (Integer) repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
+        Assertions.assertEquals(0, repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
                 "Verifying From Penalty Charges due fot first Repayment after Successful completion of Scheduler Job");
 
     }
@@ -969,7 +968,7 @@ public class SchedulerJobsTestResults {
             GetLoansLoanIdResponse getLoansLoanIdResponse = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanID);
             // First accrual transaction
             assertTrue(getLoansLoanIdResponse.getTransactions().get(1).getType().getAccrual());
-            assertEquals(10.0f, getLoansLoanIdResponse.getTransactions().get(1).getFeeChargesPortion());
+            assertEquals(10.00, Utils.getDoubleValue(getLoansLoanIdResponse.getTransactions().get(1).getFeeChargesPortion()));
             assertEquals(LocalDate.of(2020, 6, 2), getLoansLoanIdResponse.getTransactions().get(1).getDate());
             Long transactionId = getLoansLoanIdResponse.getTransactions().get(1).getId();
 
@@ -1086,7 +1085,7 @@ public class SchedulerJobsTestResults {
             this.schedulerJobHelper.executeAndAwaitJob(jobName);
             List<HashMap> repaymentScheduleDataAfter = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, responseSpec,
                     loanID);
-            Assertions.assertEquals(0, (Integer) repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
+            Assertions.assertEquals(0, repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
                     "Verifying From Penalty Charges due fot first Repayment after Successful completion of Scheduler Job");
 
             LocalDate lastBusinessDateBeforeFastForward = LocalDate.of(2019, 4, 2);
@@ -1154,7 +1153,7 @@ public class SchedulerJobsTestResults {
             this.schedulerJobHelper.executeAndAwaitJob(jobName);
             List<HashMap> repaymentScheduleDataAfter = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, responseSpec,
                     loanID2);
-            Assertions.assertEquals(0, (Integer) repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
+            Assertions.assertEquals(0, repaymentScheduleDataAfter.get(1).get("penaltyChargesDue"),
                     "Verifying From Penalty Charges due fot first Repayment after Successful completion of Scheduler Job");
 
             BusinessDateHelper.updateBusinessDate(requestSpec, responseSpec, BusinessDateType.COB_DATE, LocalDate.of(2020, 5, 3));
@@ -1349,7 +1348,7 @@ public class SchedulerJobsTestResults {
         try {
             globalConfigurationHelper.updateGlobalConfiguration(GlobalConfigurationConstants.ENABLE_BUSINESS_DATE,
                     new PutGlobalConfigurationsRequest().enabled(true));
-            businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BusinessDateType.BUSINESS_DATE.getName())
+            businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
                     .date("2022.09.04").dateFormat("yyyy.MM.dd").locale("en"));
 
             final Account assetAccount = this.accountHelper.createAssetAccount();
@@ -1376,7 +1375,7 @@ public class SchedulerJobsTestResults {
             this.loanTransactionHelper.approveLoan("02 September 2022", loanId);
             this.loanTransactionHelper.disburseLoan("03 September 2022", loanId, "1000", null);
 
-            businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BusinessDateType.BUSINESS_DATE.getName())
+            businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
                     .date("2022.09.05").dateFormat("yyyy.MM.dd").locale("en"));
 
             LocalDate targetDate = LocalDate.of(2022, 9, 5);

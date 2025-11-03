@@ -145,6 +145,13 @@ public class LoanChargeAdjustmentStepDef extends AbstractStepDef {
         ErrorHelper.checkSuccessfulApiCall(chargeAdjustmentUndoResponse);
     }
 
+    @Then("Charge adjustment response has the subResourceExternalId")
+    public void checkChargeAdjustmentResponse() {
+        final Response<PostLoansLoanIdChargesChargeIdResponse> response = testContext().get(TestContextKey.LOAN_CHARGE_ADJUSTMENT_RESPONSE);
+        final PostLoansLoanIdChargesChargeIdResponse body = response.body();
+        assertThat(body.getSubResourceExternalId()).isNotNull();
+    }
+
     private Long getTransactionIdForTransactionMetConditions(String transactionDate, double transactionAmount,
             Response<GetLoansLoanIdResponse> loanDetailsResponse) {
         List<GetLoansLoanIdTransactions> transactions = loanDetailsResponse.body().getTransactions();
@@ -154,7 +161,7 @@ public class LoanChargeAdjustmentStepDef extends AbstractStepDef {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
             String dateActual = formatter.format(date);
 
-            Double amountActual = transactions.get(i).getAmount();
+            Double amountActual = transactions.get(i).getAmount().doubleValue();
 
             if (dateActual.equals(transactionDate) && amountActual.equals(transactionAmount)) {
                 transactionMetConditions = transactions.get(i);

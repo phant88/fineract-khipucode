@@ -20,6 +20,7 @@ package org.apache.fineract.infrastructure.configuration.domain;
 
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -58,6 +59,20 @@ public class ConfigurationDomainServiceJpa implements ConfigurationDomainService
             return thisTask.hasMakerCheckerEnabled();
         }
         return false;
+    }
+
+    @Override
+    public List<String> getAllowedLoanStatusesForExternalAssetTransfer() {
+        final GlobalConfigurationPropertyData property = getGlobalConfigurationPropertyData(
+                GlobalConfigurationConstants.ALLOWED_LOAN_STATUSES_FOR_EXTERNAL_ASSET_TRANSFER);
+        return List.of(property.getStringValue().split(","));
+    }
+
+    @Override
+    public List<String> getAllowedLoanStatusesOfDelayedSettlementForExternalAssetTransfer() {
+        final GlobalConfigurationPropertyData property = getGlobalConfigurationPropertyData(
+                GlobalConfigurationConstants.ALLOWED_LOAN_STATUSES_OF_DELAYED_SETTLEMENT_FOR_EXTERNAL_ASSET_TRANSFER);
+        return List.of(property.getStringValue().split(","));
     }
 
     @Override
@@ -526,5 +541,11 @@ public class ConfigurationDomainServiceJpa implements ConfigurationDomainService
     @Override
     public boolean isImmediateChargeAccrualPostMaturityEnabled() {
         return getGlobalConfigurationPropertyData(GlobalConfigurationConstants.ENABLE_IMMEDIATE_CHARGE_ACCRUAL_POST_MATURITY).isEnabled();
+    }
+
+    @Override
+    public String getAssetOwnerTransferOustandingInterestStrategy() {
+        return getGlobalConfigurationPropertyData(
+                GlobalConfigurationConstants.ASSET_OWNER_TRANSFER_OUTSTANDING_INTEREST_CALCULATION_STRATEGY).getStringValue();
     }
 }

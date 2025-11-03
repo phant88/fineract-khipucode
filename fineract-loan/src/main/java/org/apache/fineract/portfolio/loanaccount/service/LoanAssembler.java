@@ -21,6 +21,7 @@ package org.apache.fineract.portfolio.loanaccount.service;
 import java.util.Map;
 import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
+import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.organisation.staff.domain.Staff;
 import org.apache.fineract.portfolio.fund.domain.Fund;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
@@ -30,9 +31,13 @@ public interface LoanAssembler {
 
     Loan assembleFrom(Long accountId);
 
-    Loan assembleFrom(JsonCommand command);
+    Loan assembleFrom(Long accountId, boolean loadLazyCollections);
 
-    void setHelpers(Loan loanAccount);
+    Loan assembleFrom(ExternalId externalId);
+
+    Loan assembleFrom(ExternalId externalId, boolean loadLazyCollections);
+
+    Loan assembleFrom(JsonCommand command);
 
     void accountNumberGeneration(JsonCommand command, Loan loan);
 

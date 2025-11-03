@@ -31,15 +31,13 @@ import io.restassured.specification.RequestSpecification;
 import io.restassured.specification.ResponseSpecification;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.fineract.client.models.AdvancedPaymentData;
-import org.apache.fineract.client.models.GetDelinquencyBucketsResponse;
-import org.apache.fineract.client.models.GetDelinquencyRangesResponse;
+import org.apache.fineract.client.models.DelinquencyBucketData;
+import org.apache.fineract.client.models.DelinquencyRangeData;
 import org.apache.fineract.client.models.GetLoanProductsProductIdResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdRepaymentPeriod;
 import org.apache.fineract.client.models.GetLoansLoanIdRepaymentSchedule;
@@ -102,7 +100,7 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
             final SchedulerJobHelper schedulerJobHelper = new SchedulerJobHelper(requestSpec);
             // Delinquency Bucket
             final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
-            final GetDelinquencyBucketsResponse delinquencyBucket = DelinquencyBucketsHelper.getDelinquencyBucket(requestSpec, responseSpec,
+            final DelinquencyBucketData delinquencyBucket = DelinquencyBucketsHelper.getDelinquencyBucket(requestSpec, responseSpec,
                     delinquencyBucketId);
 
             // Client and Loan account creation
@@ -170,9 +168,8 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
             BusinessDateHelper.updateBusinessDate(requestSpec, responseSpec, BusinessDateType.BUSINESS_DATE, businessDate);
             log.info("Current Business date {}", businessDate);
 
-            // Run the Loan COB Job
-            final String jobName = "Loan COB";
-            schedulerJobHelper.executeAndAwaitJob(jobName);
+            // Run the Loan inline COB Job
+            inlineLoanCOBHelper.executeInlineCOB(Long.valueOf(loanId));
 
             // Get loan details expecting to have a delinquency classification
             getLoansLoanIdResponse = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanId);
@@ -225,7 +222,7 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
             final SchedulerJobHelper schedulerJobHelper = new SchedulerJobHelper(requestSpec);
             // Delinquency Bucket
             final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
-            final GetDelinquencyBucketsResponse delinquencyBucket = DelinquencyBucketsHelper.getDelinquencyBucket(requestSpec, responseSpec,
+            final DelinquencyBucketData delinquencyBucket = DelinquencyBucketsHelper.getDelinquencyBucket(requestSpec, responseSpec,
                     delinquencyBucketId);
 
             // Client and Loan account creation
@@ -295,9 +292,8 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
             BusinessDateHelper.updateBusinessDate(requestSpec, responseSpec, BusinessDateType.BUSINESS_DATE, businessDate);
             log.info("Current Business date {}", businessDate);
 
-            // Run the Loan COB Job
-            final String jobName = "Loan COB";
-            schedulerJobHelper.executeAndAwaitJob(jobName);
+            // Run the Loan inline COB Job
+            inlineLoanCOBHelper.executeInlineCOB(Long.valueOf(loanId));
 
             // Get loan details expecting to have a delinquency classification
             getLoansLoanIdResponse = loanTransactionHelper.getLoan(requestSpec, responseSpec, loanId);
@@ -366,10 +362,10 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
         return loanId;
     }
 
-    private GetDelinquencyRangesResponse validateLoanAccount(GetLoansLoanIdResponse getLoansLoanIdResponse, final String adjustments,
+    private DelinquencyRangeData validateLoanAccount(GetLoansLoanIdResponse getLoansLoanIdResponse, final String adjustments,
             final String outstanding, Integer pastDueDays, Double delinquentAmount) {
         assertNotNull(getLoansLoanIdResponse);
-        final GetDelinquencyRangesResponse delinquencyRange = getLoansLoanIdResponse.getDelinquencyRange();
+        final DelinquencyRangeData delinquencyRange = getLoansLoanIdResponse.getDelinquencyRange();
 
         log.info("Loan Delinquency Range is null {}", (delinquencyRange == null));
         if (delinquencyRange != null) {
@@ -397,31 +393,6 @@ public class DelinquencyAndChargebackIntegrationTest extends BaseLoanIntegration
 
         advancedPaymentData.setPaymentAllocationOrder(paymentAllocationOrders);
         return advancedPaymentData;
-    }
-
-    private static AdvancedPaymentData createDefaultPaymentAllocation() {
-        AdvancedPaymentData advancedPaymentData = new AdvancedPaymentData();
-        advancedPaymentData.setTransactionType("DEFAULT");
-        advancedPaymentData.setFutureInstallmentAllocationRule("NEXT_INSTALLMENT");
-
-        List<PaymentAllocationOrder> paymentAllocationOrders = getPaymentAllocationOrder(PaymentAllocationType.PAST_DUE_PENALTY,
-                PaymentAllocationType.PAST_DUE_FEE, PaymentAllocationType.PAST_DUE_PRINCIPAL, PaymentAllocationType.PAST_DUE_INTEREST,
-                PaymentAllocationType.DUE_PENALTY, PaymentAllocationType.DUE_FEE, PaymentAllocationType.DUE_PRINCIPAL,
-                PaymentAllocationType.DUE_INTEREST, PaymentAllocationType.IN_ADVANCE_PENALTY, PaymentAllocationType.IN_ADVANCE_FEE,
-                PaymentAllocationType.IN_ADVANCE_PRINCIPAL, PaymentAllocationType.IN_ADVANCE_INTEREST);
-
-        advancedPaymentData.setPaymentAllocationOrder(paymentAllocationOrders);
-        return advancedPaymentData;
-    }
-
-    private static List<PaymentAllocationOrder> getPaymentAllocationOrder(PaymentAllocationType... paymentAllocationTypes) {
-        AtomicInteger integer = new AtomicInteger(1);
-        return Arrays.stream(paymentAllocationTypes).map(pat -> {
-            PaymentAllocationOrder paymentAllocationOrder = new PaymentAllocationOrder();
-            paymentAllocationOrder.setPaymentAllocationRule(pat.name());
-            paymentAllocationOrder.setOrder(integer.getAndIncrement());
-            return paymentAllocationOrder;
-        }).toList();
     }
 
     private static Stream<Arguments> loanProductFactory() {

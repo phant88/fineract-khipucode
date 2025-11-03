@@ -20,6 +20,7 @@ package org.apache.fineract.test.helper;
 
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.apache.fineract.client.models.GetCodesResponse;
 import org.apache.fineract.client.models.PostCodeValueDataResponse;
 import org.apache.fineract.client.models.PostCodeValuesDataRequest;
@@ -54,8 +55,13 @@ public class CodeHelper {
         return codeValuesApi.createCodeValue(codeId, new PostCodeValuesDataRequest().name(stateName)).execute();
     }
 
-    public GetCodesResponse retrieveCodeByName(String name) throws IOException {
+    @SneakyThrows
+    public GetCodesResponse retrieveCodeByName(String name) {
         return codesApi.retrieveCodes().execute().body().stream().filter(r -> name.equals(r.getName())).findAny()
                 .orElseThrow(() -> new IllegalArgumentException("Code with name " + name + " has not been found"));
+    }
+
+    public Response<PostCodeValueDataResponse> createCodeValue(Long codeId, PostCodeValuesDataRequest request) throws IOException {
+        return codeValuesApi.createCodeValue(codeId, request).execute();
     }
 }

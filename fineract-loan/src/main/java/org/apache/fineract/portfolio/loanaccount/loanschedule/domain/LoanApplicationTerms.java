@@ -38,6 +38,7 @@ import org.apache.fineract.portfolio.calendar.domain.CalendarInstance;
 import org.apache.fineract.portfolio.calendar.service.CalendarUtils;
 import org.apache.fineract.portfolio.common.domain.DayOfWeekType;
 import org.apache.fineract.portfolio.common.domain.DaysInMonthType;
+import org.apache.fineract.portfolio.common.domain.DaysInYearCustomStrategyType;
 import org.apache.fineract.portfolio.common.domain.DaysInYearType;
 import org.apache.fineract.portfolio.common.domain.NthDayType;
 import org.apache.fineract.portfolio.common.domain.PeriodFrequencyType;
@@ -45,6 +46,12 @@ import org.apache.fineract.portfolio.loanaccount.data.DisbursementData;
 import org.apache.fineract.portfolio.loanaccount.data.HolidayDetailDTO;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsData;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTermVariationsDataWrapper;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeCalculationType;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeIncomeType;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanBuyDownFeeStrategy;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeCalculationType;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeStrategy;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanCapitalizedIncomeType;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanChargeOffBehaviour;
 import org.apache.fineract.portfolio.loanproduct.data.LoanProductRelatedDetailMinimumData;
 import org.apache.fineract.portfolio.loanproduct.domain.AmortizationMethod;
@@ -229,6 +236,17 @@ public final class LoanApplicationTerms {
     private boolean enableAccrualActivityPosting;
     private List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes;
     private LoanChargeOffBehaviour chargeOffBehaviour;
+    private boolean interestRecognitionOnDisbursementDate;
+    private DaysInYearCustomStrategyType daysInYearCustomStrategy;
+    private boolean enableIncomeCapitalization;
+    private LoanCapitalizedIncomeCalculationType capitalizedIncomeCalculationType;
+    private LoanCapitalizedIncomeStrategy capitalizedIncomeStrategy;
+    private LoanCapitalizedIncomeType capitalizedIncomeType;
+    private boolean enableBuyDownFee;
+    private LoanBuyDownFeeCalculationType buyDownFeeCalculationType;
+    private LoanBuyDownFeeStrategy buyDownFeeStrategy;
+    private LoanBuyDownFeeIncomeType buyDownFeeIncomeType;
+    private boolean merchantBuyDownFee;
 
     private LoanApplicationTerms(Builder builder) {
         this.currency = builder.currency;
@@ -253,6 +271,8 @@ public final class LoanApplicationTerms {
         this.seedDate = builder.seedDate;
         this.isDownPaymentEnabled = builder.isDownPaymentEnabled;
         this.disbursedAmountPercentageForDownPayment = builder.downPaymentPercentage;
+        this.interestRecognitionOnDisbursementDate = builder.interestRecognitionOnDisbursementDate != null
+                && builder.interestRecognitionOnDisbursementDate;
         if (isDownPaymentEnabled) {
             this.downPaymentAmount = Money.of(getCurrency(),
                     MathUtil.percentageOf(getPrincipal().getAmount(), getDisbursedAmountPercentageForDownPayment(), builder.mc),
@@ -263,10 +283,22 @@ public final class LoanApplicationTerms {
         } else {
             this.downPaymentAmount = Money.zero(getCurrency(), builder.mc);
         }
+        this.enableIncomeCapitalization = builder.enableIncomeCapitalization;
+        this.capitalizedIncomeCalculationType = builder.capitalizedIncomeCalculationType;
+        this.capitalizedIncomeStrategy = builder.capitalizedIncomeStrategy;
+        this.capitalizedIncomeType = builder.capitalizedIncomeType;
+        this.enableBuyDownFee = builder.enableBuyDownFee;
+        this.buyDownFeeCalculationType = builder.buyDownFeeCalculationType;
+        this.buyDownFeeStrategy = builder.buyDownFeeStrategy;
+        this.buyDownFeeIncomeType = builder.buyDownFeeIncomeType;
+        this.merchantBuyDownFee = builder.merchantBuyDownFee;
+        this.interestMethod = builder.interestMethod;
+        this.allowPartialPeriodInterestCalcualtion = builder.allowPartialPeriodInterestCalculation;
     }
 
     public static class Builder {
 
+        private InterestMethod interestMethod;
         private CurrencyData currency;
         private Integer loanTermFrequency;
         private PeriodFrequencyType loanTermPeriodFrequencyType;
@@ -290,6 +322,23 @@ public final class LoanApplicationTerms {
         private LocalDate submittedOnDate;
         private LocalDate seedDate;
         private MathContext mc;
+        private Boolean interestRecognitionOnDisbursementDate;
+        private DaysInYearCustomStrategyType daysInYearCustomStrategy;
+        private boolean enableIncomeCapitalization;
+        private LoanCapitalizedIncomeCalculationType capitalizedIncomeCalculationType;
+        private LoanCapitalizedIncomeStrategy capitalizedIncomeStrategy;
+        private LoanCapitalizedIncomeType capitalizedIncomeType;
+        private boolean enableBuyDownFee;
+        private LoanBuyDownFeeCalculationType buyDownFeeCalculationType;
+        private LoanBuyDownFeeStrategy buyDownFeeStrategy;
+        private LoanBuyDownFeeIncomeType buyDownFeeIncomeType;
+        private boolean merchantBuyDownFee;
+        private boolean allowPartialPeriodInterestCalculation;
+
+        public Builder interestMethod(InterestMethod interestMethod) {
+            this.interestMethod = interestMethod;
+            return this;
+        }
 
         public Builder currency(CurrencyData currency) {
             this.currency = currency;
@@ -401,9 +450,70 @@ public final class LoanApplicationTerms {
             return this;
         }
 
+        public Builder interestRecognitionOnDisbursementDate(boolean value) {
+            this.interestRecognitionOnDisbursementDate = value;
+            return this;
+        }
+
+        public Builder enableIncomeCapitalization(boolean value) {
+            this.enableIncomeCapitalization = value;
+            return this;
+        }
+
+        public Builder capitalizedIncomeCalculationType(LoanCapitalizedIncomeCalculationType value) {
+            this.capitalizedIncomeCalculationType = value;
+            return this;
+        }
+
+        public Builder capitalizedIncomeStrategy(LoanCapitalizedIncomeStrategy value) {
+            this.capitalizedIncomeStrategy = value;
+            return this;
+        }
+
+        public Builder capitalizedIncomeType(LoanCapitalizedIncomeType value) {
+            this.capitalizedIncomeType = value;
+            return this;
+        }
+
+        public Builder enableBuyDownFee(boolean value) {
+            this.enableBuyDownFee = value;
+            return this;
+        }
+
+        public Builder buyDownFeeCalculationType(LoanBuyDownFeeCalculationType value) {
+            this.buyDownFeeCalculationType = value;
+            return this;
+        }
+
+        public Builder buyDownFeeStrategy(LoanBuyDownFeeStrategy value) {
+            this.buyDownFeeStrategy = value;
+            return this;
+        }
+
+        public Builder buyDownFeeIncomeType(LoanBuyDownFeeIncomeType value) {
+            this.buyDownFeeIncomeType = value;
+            return this;
+        }
+
+        public Builder merchantBuyDownFee(boolean value) {
+            this.merchantBuyDownFee = value;
+            return this;
+        }
+
         public LoanApplicationTerms build() {
             return new LoanApplicationTerms(this);
         }
+
+        public Builder daysInYearCustomStrategy(DaysInYearCustomStrategyType daysInYearCustomStrategy) {
+            this.daysInYearCustomStrategy = daysInYearCustomStrategy;
+            return this;
+        }
+
+        public Builder allowPartialPeriodInterestCalculation(boolean allowPartialPeriodInterestCalculation) {
+            this.allowPartialPeriodInterestCalculation = allowPartialPeriodInterestCalculation;
+            return this;
+        }
+
     }
 
     public static LoanApplicationTerms assembleFrom(LoanRepaymentScheduleModelData modelData, MathContext mc) {
@@ -429,7 +539,10 @@ public final class LoanApplicationTerms {
                 .daysInMonthType(modelData.daysInMonth()).daysInYearType(modelData.daysInYear()).fixedLength(modelData.fixedLength())
                 .inArrearsTolerance(Money.zero(modelData.currency(), mc)).disbursementDatas(new ArrayList<>())
                 .isDownPaymentEnabled(modelData.downPaymentEnabled()).downPaymentPercentage(downPaymentPercentage)
-                .submittedOnDate(modelData.scheduleGenerationStartDate()).seedDate(seedDate).mc(mc).build();
+                .submittedOnDate(modelData.scheduleGenerationStartDate()).seedDate(seedDate)
+                .interestRecognitionOnDisbursementDate(modelData.interestRecognitionOnDisbursementDate())
+                .daysInYearCustomStrategy(modelData.daysInYearCustomStrategy()).interestMethod(modelData.interestMethod())
+                .allowPartialPeriodInterestCalculation(modelData.allowPartialPeriodInterestCalculation()).mc(mc).build();
     }
 
     public static LoanApplicationTerms assembleFrom(final CurrencyData currency, final Integer loanTermFrequency,
@@ -437,7 +550,7 @@ public final class LoanApplicationTerms {
             final PeriodFrequencyType repaymentPeriodFrequencyType, Integer nthDay, DayOfWeekType weekDayType,
             final AmortizationMethod amortizationMethod, final InterestMethod interestMethod, final BigDecimal interestRatePerPeriod,
             final PeriodFrequencyType interestRatePeriodFrequencyType, final BigDecimal annualNominalInterestRate,
-            final InterestCalculationPeriodMethod interestCalculationPeriodMethod, final boolean allowPartialPeriodInterestCalcualtion,
+            final InterestCalculationPeriodMethod interestCalculationPeriodMethod, final boolean allowPartialPeriodInterestCalculation,
             final Money principalMoney, final LocalDate expectedDisbursementDate, final LocalDate repaymentsStartingFromDate,
             final LocalDate calculatedRepaymentsStartingFromDate, final Integer graceOnPrincipalPayment,
             final Integer recurringMoratoriumOnPrincipalPeriods, final Integer graceOnInterestPayment, final Integer graceOnInterestCharged,
@@ -460,14 +573,20 @@ public final class LoanApplicationTerms {
             final LocalDate submittedOnDate, final LoanScheduleType loanScheduleType,
             final LoanScheduleProcessingType loanScheduleProcessingType, final Integer fixedLength,
             final boolean enableAccrualActivityPosting, final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes,
-            final LoanChargeOffBehaviour chargeOffBehaviour) {
+            final LoanChargeOffBehaviour chargeOffBehaviour, final boolean interestRecognitionOnDisbursementDate,
+            final DaysInYearCustomStrategyType daysInYearCustomStrategy, final boolean enableIncomeCapitalization,
+            final LoanCapitalizedIncomeCalculationType capitalizedIncomeCalculationType,
+            final LoanCapitalizedIncomeStrategy capitalizedIncomeStrategy, final LoanCapitalizedIncomeType capitalizedIncomeType,
+            final boolean enableBuyDownFee, final LoanBuyDownFeeCalculationType buyDownFeeCalculationType,
+            final LoanBuyDownFeeStrategy buyDownFeeStrategy, final LoanBuyDownFeeIncomeType buyDownFeeIncomeType,
+            final boolean merchantBuyDownFee) {
 
         final LoanRescheduleStrategyMethod rescheduleStrategyMethod = null;
         final CalendarHistoryDataWrapper calendarHistoryDataWrapper = null;
         return new LoanApplicationTerms(currency, loanTermFrequency, loanTermPeriodFrequencyType, numberOfRepayments, repaymentEvery,
                 repaymentPeriodFrequencyType, nthDay, weekDayType, amortizationMethod, interestMethod, interestRatePerPeriod,
                 interestRatePeriodFrequencyType, annualNominalInterestRate, interestCalculationPeriodMethod,
-                allowPartialPeriodInterestCalcualtion, principalMoney, expectedDisbursementDate, repaymentsStartingFromDate,
+                allowPartialPeriodInterestCalculation, principalMoney, expectedDisbursementDate, repaymentsStartingFromDate,
                 calculatedRepaymentsStartingFromDate, graceOnPrincipalPayment, recurringMoratoriumOnPrincipalPeriods,
                 graceOnInterestPayment, graceOnInterestCharged, interestChargedFromDate, inArrearsTolerance, multiDisburseLoan, emiAmount,
                 disbursementDatas, maxOutstandingBalance, graceOnArrearsAgeing, daysInMonthType, daysInYearType,
@@ -479,7 +598,10 @@ public final class LoanApplicationTerms {
                 isInterestToBeRecoveredFirstWhenGreaterThanEMI, fixedPrincipalPercentagePerInstallment,
                 isPrincipalCompoundingDisabledForOverdueLoans, enableDownPayment, disbursedAmountPercentageForDownPayment,
                 isAutoRepaymentForDownPaymentEnabled, repaymentStartDateType, submittedOnDate, loanScheduleType, loanScheduleProcessingType,
-                fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes, chargeOffBehaviour);
+                fixedLength, enableAccrualActivityPosting, supportedInterestRefundTypes, chargeOffBehaviour,
+                interestRecognitionOnDisbursementDate, daysInYearCustomStrategy, enableIncomeCapitalization,
+                capitalizedIncomeCalculationType, capitalizedIncomeStrategy, capitalizedIncomeType, enableBuyDownFee,
+                buyDownFeeCalculationType, buyDownFeeStrategy, buyDownFeeIncomeType, merchantBuyDownFee);
 
     }
 
@@ -511,7 +633,7 @@ public final class LoanApplicationTerms {
         final PeriodFrequencyType interestRatePeriodFrequencyType = loanProductRelatedDetail.getInterestPeriodFrequencyType();
         final InterestCalculationPeriodMethod interestCalculationPeriodMethod = loanProductRelatedDetail
                 .getInterestCalculationPeriodMethod();
-        final boolean allowPartialPeriodInterestCalcualtion = loanProductRelatedDetail.isAllowPartialPeriodInterestCalcualtion();
+        final boolean allowPartialPeriodInterestCalculation = loanProductRelatedDetail.isAllowPartialPeriodInterestCalculation();
         final Money principalMoney = loanProductRelatedDetail.getPrincipal();
 
         //
@@ -539,7 +661,7 @@ public final class LoanApplicationTerms {
         return new LoanApplicationTerms(currency, loanTermFrequency, loanTermPeriodFrequencyType, numberOfRepayments, repaymentEvery,
                 repaymentPeriodFrequencyType, ((nthDay != null) ? nthDay.getValue() : null), dayOfWeek, amortizationMethod, interestMethod,
                 interestRatePerPeriod, interestRatePeriodFrequencyType, annualNominalInterestRate, interestCalculationPeriodMethod,
-                allowPartialPeriodInterestCalcualtion, principalMoney, expectedDisbursementDate, repaymentsStartingFromDate,
+                allowPartialPeriodInterestCalculation, principalMoney, expectedDisbursementDate, repaymentsStartingFromDate,
                 calculatedRepaymentsStartingFromDate, graceOnPrincipalPayment, recurringMoratoriumOnPrincipalPeriods,
                 graceOnInterestPayment, graceOnInterestCharged, interestChargedFromDate, inArrearsTolerance, multiDisburseLoan, emiAmount,
                 disbursementDatas, maxOutstandingBalance, loanProductRelatedDetail.getGraceOnArrearsAgeing(), daysInMonthType,
@@ -552,7 +674,13 @@ public final class LoanApplicationTerms {
                 fixedPrincipalPercentagePerInstallment, isPrincipalCompoundingDisabledForOverdueLoans, isDownPaymentEnabled,
                 disbursedAmountPercentageForDownPayment, isAutoRepaymentForDownPaymentEnabled, repaymentStartDateType, submittedOnDate,
                 loanScheduleType, loanScheduleProcessingType, fixedLength, loanProductRelatedDetail.isEnableAccrualActivityPosting(),
-                loanProductRelatedDetail.getSupportedInterestRefundTypes(), loanProductRelatedDetail.getChargeOffBehaviour());
+                loanProductRelatedDetail.getSupportedInterestRefundTypes(), loanProductRelatedDetail.getChargeOffBehaviour(),
+                loanProductRelatedDetail.isInterestRecognitionOnDisbursementDate(), loanProductRelatedDetail.getDaysInYearCustomStrategy(),
+                loanProductRelatedDetail.isEnableIncomeCapitalization(), loanProductRelatedDetail.getCapitalizedIncomeCalculationType(),
+                loanProductRelatedDetail.getCapitalizedIncomeStrategy(), loanProductRelatedDetail.getCapitalizedIncomeType(),
+                loanProductRelatedDetail.isEnableBuyDownFee(), loanProductRelatedDetail.getBuyDownFeeCalculationType(),
+                loanProductRelatedDetail.getBuyDownFeeStrategy(), loanProductRelatedDetail.getBuyDownFeeIncomeType(),
+                loanProductRelatedDetail.isMerchantBuyDownFee());
     }
 
     private LoanApplicationTerms(final CurrencyData currency, final Integer loanTermFrequency,
@@ -582,7 +710,13 @@ public final class LoanApplicationTerms {
             final BigDecimal disbursedAmountPercentageForDownPayment, final boolean isAutoRepaymentForDownPaymentEnabled,
             final RepaymentStartDateType repaymentStartDateType, final LocalDate submittedOnDate, final LoanScheduleType loanScheduleType,
             final LoanScheduleProcessingType loanScheduleProcessingType, final Integer fixedLength, boolean enableAccrualActivityPosting,
-            final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes, final LoanChargeOffBehaviour chargeOffBehaviour) {
+            final List<LoanSupportedInterestRefundTypes> supportedInterestRefundTypes, final LoanChargeOffBehaviour chargeOffBehaviour,
+            final boolean interestRecognitionOnDisbursementDate, final DaysInYearCustomStrategyType daysInYearCustomStrategy,
+            final boolean enableIncomeCapitalization, final LoanCapitalizedIncomeCalculationType capitalizedIncomeCalculationType,
+            final LoanCapitalizedIncomeStrategy capitalizedIncomeStrategy, final LoanCapitalizedIncomeType capitalizedIncomeType,
+            final boolean enableBuyDownFee, final LoanBuyDownFeeCalculationType buyDownFeeCalculationType,
+            final LoanBuyDownFeeStrategy buyDownFeeStrategy, final LoanBuyDownFeeIncomeType buyDownFeeIncomeType,
+            final boolean merchantBuyDownFee) {
 
         this.currency = currency;
         this.loanTermFrequency = loanTermFrequency;
@@ -682,6 +816,17 @@ public final class LoanApplicationTerms {
         this.fixedLength = fixedLength;
         this.supportedInterestRefundTypes = supportedInterestRefundTypes;
         this.chargeOffBehaviour = chargeOffBehaviour;
+        this.interestRecognitionOnDisbursementDate = interestRecognitionOnDisbursementDate;
+        this.daysInYearCustomStrategy = daysInYearCustomStrategy;
+        this.enableIncomeCapitalization = enableIncomeCapitalization;
+        this.capitalizedIncomeCalculationType = capitalizedIncomeCalculationType;
+        this.capitalizedIncomeStrategy = capitalizedIncomeStrategy;
+        this.capitalizedIncomeType = capitalizedIncomeType;
+        this.enableBuyDownFee = enableBuyDownFee;
+        this.buyDownFeeCalculationType = buyDownFeeCalculationType;
+        this.buyDownFeeStrategy = buyDownFeeStrategy;
+        this.buyDownFeeIncomeType = buyDownFeeIncomeType;
+        this.merchantBuyDownFee = merchantBuyDownFee;
     }
 
     public Money adjustPrincipalIfLastRepaymentPeriod(final Money principalForPeriod, final Money totalCumulativePrincipalToDate,
@@ -940,7 +1085,7 @@ public final class LoanApplicationTerms {
         final BigDecimal loanTermFrequencyBigDecimal = calculatePeriodsInLoanTerm();
 
         return this.annualNominalInterestRate.divide(loanTermPeriodsInYearBigDecimal, mc).divide(divisor, mc)
-                .multiply(loanTermFrequencyBigDecimal);
+                .multiply(loanTermFrequencyBigDecimal, mc);
     }
 
     private BigDecimal calculatePeriodsInLoanTerm() {
@@ -1072,7 +1217,7 @@ public final class LoanApplicationTerms {
     private Money calculateTotalPrincipalPerPeriodWithoutGrace(final MathContext mc, final int periodNumber,
             Money interestForThisInstallment) {
         final int totalRepaymentsWithCapitalPayment = calculateNumberOfRepaymentsWithPrincipalPayment();
-        Money principalPerPeriod = null;
+        Money principalPerPeriod;
         if (getFixedEmiAmount() == null) {
             if (this.fixedPrincipalPercentagePerInstallment != null) {
                 principalPerPeriod = this.principal.minus(totalPrincipalAccounted)
@@ -1092,7 +1237,7 @@ public final class LoanApplicationTerms {
             }
 
             if (this.installmentAmountInMultiplesOf != null) {
-                Money roundedPrincipalPerPeriod = Money.roundToMultiplesOf(principalPerPeriod, this.installmentAmountInMultiplesOf);
+                Money roundedPrincipalPerPeriod = Money.roundToMultiplesOf(principalPerPeriod, this.installmentAmountInMultiplesOf, mc);
                 if (interestForThisInstallment != null) {
                     Money roundedInterestForThisInstallment = Money.roundToMultiplesOf(interestForThisInstallment,
                             this.installmentAmountInMultiplesOf);
@@ -1543,16 +1688,21 @@ public final class LoanApplicationTerms {
                 this.interestRecalculationEnabled, this.isEqualAmortization, this.isDownPaymentEnabled,
                 this.disbursedAmountPercentageForDownPayment, this.isAutoRepaymentForDownPaymentEnabled, this.loanScheduleType,
                 this.loanScheduleProcessingType, this.fixedLength, this.enableAccrualActivityPosting, this.supportedInterestRefundTypes,
-                this.chargeOffBehaviour);
+                this.chargeOffBehaviour, this.interestRecognitionOnDisbursementDate, this.daysInYearCustomStrategy,
+                this.enableIncomeCapitalization, this.capitalizedIncomeCalculationType, this.capitalizedIncomeStrategy,
+                this.capitalizedIncomeType, this.installmentAmountInMultiplesOf, this.enableBuyDownFee, this.buyDownFeeCalculationType,
+                this.buyDownFeeStrategy, this.buyDownFeeIncomeType, this.merchantBuyDownFee);
     }
 
     public LoanProductMinimumRepaymentScheduleRelatedDetail toLoanProductRelatedDetailMinimumData() {
         final CurrencyData currency = new CurrencyData(this.currency.getCode(), this.currency.getDecimalPlaces(),
                 this.currency.getInMultiplesOf());
-        return new LoanProductRelatedDetailMinimumData(currency, principal, inArrearsTolerance, interestRatePerPeriod,
-                annualNominalInterestRate, interestChargingGrace, interestPaymentGrace, principalGrace,
-                recurringMoratoriumOnPrincipalPeriods, interestMethod, interestCalculationPeriodMethod, daysInYearType, daysInMonthType,
-                amortizationMethod, repaymentPeriodFrequencyType, repaymentEvery, numberOfRepayments);
+        return new LoanProductRelatedDetailMinimumData(currency, interestRatePerPeriod, annualNominalInterestRate, interestChargingGrace,
+                interestPaymentGrace, principalGrace, recurringMoratoriumOnPrincipalPeriods, interestMethod,
+                interestCalculationPeriodMethod, daysInYearType, daysInMonthType, amortizationMethod, repaymentPeriodFrequencyType,
+                repaymentEvery, numberOfRepayments,
+                isInterestChargedFromDateSameAsDisbursalDateEnabled != null && isInterestChargedFromDateSameAsDisbursalDateEnabled,
+                daysInYearCustomStrategy, allowPartialPeriodInterestCalcualtion);
     }
 
     public Integer getLoanTermFrequency() {
@@ -1670,6 +1820,14 @@ public final class LoanApplicationTerms {
 
     public LoanRescheduleStrategyMethod getLoanRescheduleStrategyMethod() {
         return LoanRescheduleStrategyMethod.REDUCE_EMI_AMOUNT;
+    }
+
+    public boolean isInterestBearing() {
+        return BigDecimal.ZERO.compareTo(getAnnualNominalInterestRate()) < 0;
+    }
+
+    public boolean isInterestBearingAndInterestRecalculationEnabled() {
+        return isInterestBearing() && isInterestRecalculationEnabled();
     }
 
     public boolean isInterestRecalculationEnabled() {

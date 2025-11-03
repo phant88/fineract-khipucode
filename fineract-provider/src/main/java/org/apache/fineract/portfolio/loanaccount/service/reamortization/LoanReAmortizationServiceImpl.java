@@ -26,6 +26,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.apache.fineract.infrastructure.codes.domain.CodeValue;
+import org.apache.fineract.infrastructure.codes.domain.CodeValueRepository;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuilder;
@@ -38,17 +40,21 @@ import org.apache.fineract.infrastructure.event.business.domain.loan.transaction
 import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.reamortization.LoanUndoReAmortizeTransactionBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.organisation.monetary.domain.Money;
+import org.apache.fineract.portfolio.loanaccount.api.LoanApiConstants;
 import org.apache.fineract.portfolio.loanaccount.api.LoanReAmortizationApiConstants;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTransactionProcessorFactory;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepository;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
+import org.apache.fineract.portfolio.loanaccount.domain.reamortization.LoanReAmortizationInterestHandlingType;
+import org.apache.fineract.portfolio.loanaccount.domain.reamortization.LoanReAmortizationParameter;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.LoanRepaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanChargeValidator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanAssembler;
+import org.apache.fineract.portfolio.loanaccount.service.ReprocessLoanTransactionsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +70,8 @@ public class LoanReAmortizationServiceImpl {
     private final LoanTransactionRepository loanTransactionRepository;
     private final LoanRepaymentScheduleTransactionProcessorFactory loanRepaymentScheduleTransactionProcessorFactory;
     private final LoanChargeValidator loanChargeValidator;
+    private final ReprocessLoanTransactionsService reprocessLoanTransactionsService;
+    private final CodeValueRepository codeValueRepository;
 
     public CommandProcessingResult reAmortize(Long loanId, JsonCommand command) {
         Loan loan = loanAssembler.assembleFrom(loanId);
@@ -79,6 +87,8 @@ public class LoanReAmortizationServiceImpl {
                 .determineProcessor(loan.transactionProcessingStrategy());
         loanRepaymentScheduleTransactionProcessor.processLatestTransaction(reAmortizeTransaction, new TransactionCtx(loan.getCurrency(),
                 loan.getRepaymentScheduleInstallments(), loan.getActiveCharges(), new MoneyHolder(loan.getTotalOverpaidAsMoney()), null));
+
+        reAmortizeTransaction.setLoanReAmortizationParameter(createReAmortizationParameter(reAmortizeTransaction, command));
 
         loanTransactionRepository.saveAndFlush(reAmortizeTransaction);
 
@@ -128,11 +138,11 @@ public class LoanReAmortizationServiceImpl {
     private void reverseReAmortizeTransaction(LoanTransaction reAmortizeTransaction, JsonCommand command) {
         ExternalId reversalExternalId = externalIdFactory.createFromCommand(command,
                 LoanReAmortizationApiConstants.externalIdParameterName);
-        loanChargeValidator.validateRepaymentTypeTransactionNotBeforeAChargeRefund(reAmortizeTransaction.getLoan(), reAmortizeTransaction,
-                "reversed");
+        final Loan loan = reAmortizeTransaction.getLoan();
+        loanChargeValidator.validateRepaymentTypeTransactionNotBeforeAChargeRefund(loan, reAmortizeTransaction, "reversed");
         reAmortizeTransaction.reverse(reversalExternalId);
         reAmortizeTransaction.manuallyAdjustedOrReversed();
-        reAmortizeTransaction.getLoan().reprocessTransactions();
+        reprocessLoanTransactionsService.reprocessTransactions(loan);
     }
 
     private LoanTransaction findLatestNonReversedReAmortizeTransaction(Loan loan) {
@@ -154,7 +164,23 @@ public class LoanReAmortizationServiceImpl {
         Money txPrincipal = loan.getTotalPrincipalOutstandingUntil(transactionDate);
         BigDecimal txPrincipalAmount = txPrincipal.getAmount();
 
-        return new LoanTransaction(loan, loan.getOffice(), LoanTransactionType.REAMORTIZE.getValue(), transactionDate, txPrincipalAmount,
+        return new LoanTransaction(loan, loan.getOffice(), LoanTransactionType.REAMORTIZE, transactionDate, txPrincipalAmount,
                 txPrincipalAmount, ZERO, ZERO, ZERO, null, false, null, txExternalId);
+    }
+
+    private LoanReAmortizationParameter createReAmortizationParameter(LoanTransaction reAmortizationTransaction, JsonCommand command) {
+        LoanReAmortizationInterestHandlingType reAmortizationInterestHandlingType = command.enumValueOfParameterNamed(
+                LoanReAmortizationApiConstants.reAmortizationInterestHandlingParamName, LoanReAmortizationInterestHandlingType.class);
+        if (reAmortizationInterestHandlingType == null) {
+            reAmortizationInterestHandlingType = LoanReAmortizationInterestHandlingType.DEFAULT;
+        }
+
+        CodeValue reasonCodeValue = null;
+        if (command.parameterExists(LoanReAmortizationApiConstants.reasonCodeValueIdParamName)) {
+            reasonCodeValue = codeValueRepository.findByCodeNameAndId(LoanApiConstants.REAMORTIZATION_REASONS,
+                    command.longValueOfParameterNamed(LoanReAmortizationApiConstants.reasonCodeValueIdParamName));
+        }
+
+        return new LoanReAmortizationParameter(reAmortizationTransaction, reAmortizationInterestHandlingType, reasonCodeValue);
     }
 }

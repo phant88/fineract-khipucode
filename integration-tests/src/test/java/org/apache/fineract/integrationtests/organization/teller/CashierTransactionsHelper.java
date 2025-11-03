@@ -25,12 +25,13 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.fineract.client.models.GetTellersTellerIdCashiersCashiersIdSummaryAndTransactionsResponse;
 import org.apache.fineract.client.models.GetTellersTellerIdCashiersCashiersIdTransactionsResponse;
-import org.apache.fineract.integrationtests.client.IntegrationTest;
+import org.apache.fineract.client.util.Calls;
+import org.apache.fineract.integrationtests.common.FineractClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CashierTransactionsHelper extends IntegrationTest {
+public class CashierTransactionsHelper {
 
     private final ResponseSpecification responseSpecification;
     private final RequestSpecification requestSpecification;
@@ -39,6 +40,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
     private static final String CREATE_TELLER_URL = "/fineract-provider/api/v1/tellers";
     private static final Logger LOG = LoggerFactory.getLogger(CashierTransactionsHelper.class);
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public CashierTransactionsHelper(final RequestSpecification requestSpecification, final ResponseSpecification responseSpecification) {
         this.requestSpecification = requestSpecification;
         this.responseSpecification = responseSpecification;
@@ -46,19 +51,28 @@ public class CashierTransactionsHelper extends IntegrationTest {
 
     public GetTellersTellerIdCashiersCashiersIdTransactionsResponse getTellersTellerIdCashiersCashiersIdTransactionsResponse(Long tellerId,
             Long cashierId, String currencyCode, int offset, int limit, String orderBy, String sortOrder) {
-        return ok(fineract().tellers.getTransactionsForCashier(tellerId, cashierId, currencyCode, offset, limit, orderBy, sortOrder));
+        return Calls.ok(FineractClientHelper.getFineractClient().tellers.getTransactionsForCashier(tellerId, cashierId, currencyCode,
+                offset, limit, orderBy, sortOrder));
     }
 
     public GetTellersTellerIdCashiersCashiersIdSummaryAndTransactionsResponse getTellersTellerIdCashiersCashiersIdSummaryAndTransactionsResponse(
             Long tellerId, Long cashierId, String currencyCode, int offset, int limit, String orderBy, String sortOrder) {
-        return ok(fineract().tellers.getTransactionsWithSummaryForCashier(tellerId, cashierId, currencyCode, offset, limit, orderBy,
-                sortOrder));
+        return Calls.ok(FineractClientHelper.getFineractClient().tellers.getTransactionsWithSummaryForCashier(tellerId, cashierId,
+                currencyCode, offset, limit, orderBy, sortOrder));
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static Integer createTeller(final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
         return (Integer) createTellerWithJson(requestSpec, responseSpec, createTellerAsJSON()).get("resourceId");
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static Map<String, Object> createTellerWithJson(final RequestSpecification requestSpec, final ResponseSpecification responseSpec,
             final String json) {
 
@@ -66,6 +80,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
         return Utils.performServerPost(requestSpec, responseSpec, url, json, "");
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static String createTellerAsJSON() {
 
         final Map<String, Object> map = getMapWithStartDate();
@@ -79,6 +97,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
         return new Gson().toJson(map);
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static Map<String, Object> getMapWithStartDate() {
         HashMap<String, Object> map = new HashMap<>();
 
@@ -89,6 +111,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
         return map;
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static Integer createCashier(final RequestSpecification requestSpec, final ResponseSpecification responseSpec) {
         return (Integer) createCashierWithJson(requestSpec, responseSpec, createCashierAsJSON()).get("resourceId");
     }
@@ -99,6 +125,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
         return Utils.performServerPost(requestSpec, responseSpec, url, json, "");
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static String createCashierAsJSON() {
 
         final Map<String, Object> map = getMapWithDates();
@@ -109,6 +139,10 @@ public class CashierTransactionsHelper extends IntegrationTest {
         return new Gson().toJson(map);
     }
 
+    // TODO: Rewrite to use fineract-client instead!
+    // Example: org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper.disburseLoan(java.lang.Long,
+    // org.apache.fineract.client.models.PostLoansLoanIdRequest)
+    @Deprecated(forRemoval = true)
     public static Map<String, Object> getMapWithDates() {
         HashMap<String, Object> map = new HashMap<>();
 

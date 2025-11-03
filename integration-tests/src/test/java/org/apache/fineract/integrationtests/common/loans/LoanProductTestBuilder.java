@@ -66,6 +66,7 @@ public class LoanProductTestBuilder {
     public static final String RECALCULATION_STRATEGY_RESCHEDULE_NEXT_REPAYMENTS = "1";
     public static final String RECALCULATION_STRATEGY_REDUCE_NUMBER_OF_INSTALLMENTS = "2";
     public static final String RECALCULATION_STRATEGY_REDUCE_EMI_AMOUN = "3";
+    public static final String RECALCULATION_STRATEGY_ADJUST_LAST_UNPAID_PERIOD = "4";
 
     public static final String RECALCULATION_COMPOUNDING_METHOD_NONE = "0";
     public static final String RECALCULATION_COMPOUNDING_METHOD_INTEREST = "1";
@@ -126,8 +127,8 @@ public class LoanProductTestBuilder {
     private String interestRecalculationCompoundingMethod = "0";
     private String preCloseInterestCalculationStrategy = INTEREST_APPLICABLE_STRATEGY_ON_PRE_CLOSE_DATE;
     private String rescheduleStrategyMethod = "1";
-    private String recalculationRestFrequencyType = "1";
-    private String recalculationRestFrequencyInterval = "0";
+    private String recalculationRestFrequencyType = "2";
+    private String recalculationRestFrequencyInterval = "1";
     private String recalculationCompoundingFrequencyType = null;
     private String recalculationCompoundingFrequencyInterval = null;
     private String minimumDaysBetweenDisbursalAndFirstRepayment = null;
@@ -136,8 +137,8 @@ public class LoanProductTestBuilder {
     private String minimumGuaranteeFromOwnFunds = null;
     private String minimumGuaranteeFromGuarantor = null;
     private String isArrearsBasedOnOriginalSchedule = null;
-    private String graceOnPrincipalPayment = "1";
-    private String graceOnInterestPayment = "1";
+    private String graceOnPrincipalPayment = null;
+    private String graceOnInterestPayment = null;
     private JsonObject allowAttributeOverrides = null;
     private Boolean allowPartialPeriodInterestCalcualtion = false;
 
@@ -164,6 +165,10 @@ public class LoanProductTestBuilder {
     private FullAccountingConfig fullAccountingConfig;
     private List<String> supportedInterestRefundTypes = null;
     private String chargeOffBehaviour;
+    private boolean interestRecognitionOnDisbursementDate = false;
+    private Boolean enableBuyDownFee = false;
+    private Boolean merchantBuyDownFee = false;
+    private String buyDownFeeCalculationType;
 
     public String build() {
         final HashMap<String, Object> map = build(null, null);
@@ -323,6 +328,9 @@ public class LoanProductTestBuilder {
         if (enableAutoRepaymentForDownPayment) {
             map.put("enableAutoRepaymentForDownPayment", enableAutoRepaymentForDownPayment);
         }
+        if (interestRecognitionOnDisbursementDate) {
+            map.put("interestRecognitionOnDisbursementDate", interestRecognitionOnDisbursementDate);
+        }
 
         if (this.repaymentStartDateType != null) {
             map.put("repaymentStartDateType", repaymentStartDateType);
@@ -334,6 +342,14 @@ public class LoanProductTestBuilder {
 
         if (this.chargeOffBehaviour != null) {
             map.put("chargeOffBehaviour", chargeOffBehaviour);
+        }
+
+        if (this.enableBuyDownFee != null) {
+            map.put("enableBuyDownFee", this.enableBuyDownFee);
+        }
+
+        if (this.merchantBuyDownFee != null) {
+            map.put("merchantBuyDownFee", this.merchantBuyDownFee);
         }
 
         return map;
@@ -818,7 +834,7 @@ public class LoanProductTestBuilder {
         }
         Map<String, Long> newMap = new HashMap<>();
         newMap.put("chargeOffReasonCodeValueId", reasonId);
-        newMap.put("expenseGLAccountId", accountId);
+        newMap.put("expenseAccountId", accountId);
         this.chargeOffReasonToExpenseAccountMappings.add(newMap);
         return this;
     }
@@ -901,4 +917,18 @@ public class LoanProductTestBuilder {
         }
     }
 
+    public LoanProductTestBuilder withEnableBuyDownFee(final Boolean enableBuyDownFee) {
+        this.enableBuyDownFee = enableBuyDownFee;
+        return this;
+    }
+
+    public LoanProductTestBuilder withMerchantBuyDownFee(final Boolean merchantBuyDownFee) {
+        this.merchantBuyDownFee = merchantBuyDownFee;
+        return this;
+    }
+
+    public LoanProductTestBuilder withBuyDownFeeCalculationType(final String buyDownFeeCalculationType) {
+        this.buyDownFeeCalculationType = buyDownFeeCalculationType;
+        return this;
+    }
 }

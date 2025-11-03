@@ -20,8 +20,8 @@ package org.apache.fineract.portfolio.loanproduct.data;
 
 import java.math.BigDecimal;
 import org.apache.fineract.organisation.monetary.data.CurrencyData;
-import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.common.domain.DaysInMonthType;
+import org.apache.fineract.portfolio.common.domain.DaysInYearCustomStrategyType;
 import org.apache.fineract.portfolio.common.domain.DaysInYearType;
 import org.apache.fineract.portfolio.common.domain.PeriodFrequencyType;
 import org.apache.fineract.portfolio.loanproduct.domain.AmortizationMethod;
@@ -32,39 +32,32 @@ import org.apache.fineract.portfolio.loanproduct.domain.LoanProductMinimumRepaym
 public class LoanProductRelatedDetailMinimumData implements LoanProductMinimumRepaymentScheduleRelatedDetail {
 
     private final CurrencyData currency;
-
-    private final Money principal;
-    private final Money inArrearsTolerance;
-
     private final BigDecimal interestRatePerPeriod;
     private final BigDecimal annualNominalInterestRate;
-
     private final Integer interestChargingGrace;
     private final Integer interestPaymentGrace;
     private final Integer principalGrace;
     private final Integer recurringMoratoriumOnPrincipalPeriods;
-
     private final InterestMethod interestMethod;
     private final InterestCalculationPeriodMethod interestCalculationPeriodMethod;
-
     private final DaysInYearType daysInYearType;
     private final DaysInMonthType daysInMonthType;
-
     private final AmortizationMethod amortizationMethod;
-
     private final PeriodFrequencyType repaymentPeriodFrequencyType;
     private final Integer repaymentEvery;
     private final Integer numberOfRepayments;
+    private final boolean interestRecognitionOnDisbursementDate;
+    private final DaysInYearCustomStrategyType daysInYearCustomStrategy;
+    private final boolean allowPartialPeriodInterestCalculation;
 
-    public LoanProductRelatedDetailMinimumData(CurrencyData currency, Money principal, Money inArrearsTolerance,
-            BigDecimal interestRatePerPeriod, BigDecimal annualNominalInterestRate, Integer interestChargingGrace,
-            Integer interestPaymentGrace, Integer principalGrace, Integer recurringMoratoriumOnPrincipalPeriods,
-            InterestMethod interestMethod, InterestCalculationPeriodMethod interestCalculationPeriodMethod, DaysInYearType daysInYearType,
-            DaysInMonthType daysInMonthType, AmortizationMethod amortizationMethod, PeriodFrequencyType repaymentPeriodFrequencyType,
-            Integer repaymentEvery, Integer numberOfRepayments) {
+    public LoanProductRelatedDetailMinimumData(CurrencyData currency, BigDecimal interestRatePerPeriod,
+            BigDecimal annualNominalInterestRate, Integer interestChargingGrace, Integer interestPaymentGrace, Integer principalGrace,
+            Integer recurringMoratoriumOnPrincipalPeriods, InterestMethod interestMethod,
+            InterestCalculationPeriodMethod interestCalculationPeriodMethod, DaysInYearType daysInYearType, DaysInMonthType daysInMonthType,
+            AmortizationMethod amortizationMethod, PeriodFrequencyType repaymentPeriodFrequencyType, Integer repaymentEvery,
+            Integer numberOfRepayments, boolean interestRecognitionOnDisbursementDate,
+            DaysInYearCustomStrategyType daysInYearCustomStrategy, boolean allowPartialPeriodInterestCalculation) {
         this.currency = currency;
-        this.principal = principal;
-        this.inArrearsTolerance = inArrearsTolerance;
         this.interestRatePerPeriod = interestRatePerPeriod;
         this.annualNominalInterestRate = annualNominalInterestRate;
         this.interestChargingGrace = defaultToNullIfZero(interestChargingGrace);
@@ -79,6 +72,9 @@ public class LoanProductRelatedDetailMinimumData implements LoanProductMinimumRe
         this.repaymentPeriodFrequencyType = repaymentPeriodFrequencyType;
         this.repaymentEvery = repaymentEvery;
         this.numberOfRepayments = numberOfRepayments;
+        this.interestRecognitionOnDisbursementDate = interestRecognitionOnDisbursementDate;
+        this.daysInYearCustomStrategy = daysInYearCustomStrategy;
+        this.allowPartialPeriodInterestCalculation = allowPartialPeriodInterestCalculation;
     }
 
     private Integer defaultToNullIfZero(final Integer value) {
@@ -90,13 +86,13 @@ public class LoanProductRelatedDetailMinimumData implements LoanProductMinimumRe
     }
 
     @Override
-    public CurrencyData getCurrencyData() {
-        return currency;
+    public boolean isAllowPartialPeriodInterestCalculation() {
+        return allowPartialPeriodInterestCalculation;
     }
 
     @Override
-    public Money getPrincipal() {
-        return principal;
+    public CurrencyData getCurrencyData() {
+        return currency;
     }
 
     @Override
@@ -117,11 +113,6 @@ public class LoanProductRelatedDetailMinimumData implements LoanProductMinimumRe
     @Override
     public Integer getRecurringMoratoriumOnPrincipalPeriods() {
         return recurringMoratoriumOnPrincipalPeriods;
-    }
-
-    @Override
-    public Money getInArrearsTolerance() {
-        return inArrearsTolerance;
     }
 
     @Override
@@ -182,5 +173,15 @@ public class LoanProductRelatedDetailMinimumData implements LoanProductMinimumRe
     @Override
     public Integer getDaysInYearType() {
         return daysInYearType.getValue();
+    }
+
+    @Override
+    public boolean isInterestRecognitionOnDisbursementDate() {
+        return interestRecognitionOnDisbursementDate;
+    }
+
+    @Override
+    public DaysInYearCustomStrategyType getDaysInYearCustomStrategy() {
+        return daysInYearCustomStrategy;
     }
 }

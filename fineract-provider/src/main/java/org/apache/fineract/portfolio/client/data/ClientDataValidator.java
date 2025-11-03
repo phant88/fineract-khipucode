@@ -227,7 +227,7 @@ public final class ClientDataValidator {
 
         if (this.configurationReadPlatformService.retrieveGlobalConfiguration(GlobalConfigurationConstants.ENABLE_ADDRESS).isEnabled()) {
             final JsonArray address = this.fromApiJsonHelper.extractJsonArrayNamed(ClientApiConstants.address, element);
-            baseDataValidator.reset().parameter(ClientApiConstants.address).value(address).notNull().jsonArrayNotEmpty();
+            baseDataValidator.reset().parameter(ClientApiConstants.address).value(address).ignoreIfNull().jsonArrayNotEmpty();
         }
 
         List<ApiParameterError> dataValidationErrorsForClientNonPerson = getDataValidationErrorsForCreateOnClientNonPerson(
@@ -265,8 +265,8 @@ public final class ClientDataValidator {
         if (this.fromApiJsonHelper.parameterExists(ClientApiConstants.constitutionIdParamName, element)) {
             final Integer constitution = this.fromApiJsonHelper.extractIntegerSansLocaleNamed(ClientApiConstants.constitutionIdParamName,
                     element);
-            baseDataValidator.reset().parameter(ClientApiConstants.constitutionIdParamName).value(constitution).ignoreIfNull()
-                    .integerGreaterThanZero();
+            baseDataValidator.reset().parameter(ClientApiConstants.constitutionIdParamName).value(constitution).integerGreaterThanZero()
+                    .notBlank();
         }
 
         if (this.fromApiJsonHelper.parameterExists(ClientApiConstants.mainBusinessLineIdParamName, element)) {
@@ -561,8 +561,8 @@ public final class ClientDataValidator {
             atLeastOneParameterPassedForUpdate = true;
             final Integer constitutionId = this.fromApiJsonHelper.extractIntegerSansLocaleNamed(ClientApiConstants.constitutionIdParamName,
                     element);
-            baseDataValidator.reset().parameter(ClientApiConstants.constitutionIdParamName).value(constitutionId).ignoreIfNull()
-                    .integerGreaterThanZero();
+            baseDataValidator.reset().parameter(ClientApiConstants.constitutionIdParamName).value(constitutionId).integerGreaterThanZero()
+                    .notBlank();
         }
 
         if (this.fromApiJsonHelper.parameterExists(ClientApiConstants.mainBusinessLineIdParamName, element)) {

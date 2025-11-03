@@ -817,7 +817,7 @@ public class LoanAccountPaymentAllocationWithOverlappingDownPaymentInstallmentTe
 
     private void verifyDisbursementPeriod(GetLoansLoanIdRepaymentPeriod period, LocalDate disbursementDate, double disbursedAmount) {
         assertEquals(disbursementDate, period.getDueDate());
-        assertEquals(disbursedAmount, period.getPrincipalLoanBalanceOutstanding());
+        assertEquals(disbursedAmount, Utils.getDoubleValue(period.getPrincipalLoanBalanceOutstanding()));
     }
 
     private void verifyPeriodDetails(GetLoansLoanIdRepaymentPeriod period, Integer periodNumber, double periodAmount,
@@ -826,14 +826,14 @@ public class LoanAccountPaymentAllocationWithOverlappingDownPaymentInstallmentTe
         assertEquals(periodNumber, period.getPeriod());
         assertEquals(periodFromDate, period.getFromDate());
         assertEquals(periodDueDate, period.getDueDate());
-        assertEquals(periodAmount, period.getTotalInstallmentAmountForPeriod());
-        assertEquals(periodAmountPaid, period.getTotalPaidForPeriod());
-        assertEquals(principalPaid, period.getPrincipalPaid());
-        assertEquals(outstandingAmount, period.getTotalOutstandingForPeriod());
-        assertEquals(feeDue, period.getFeeChargesDue());
-        assertEquals(feePaid, period.getFeeChargesPaid());
-        assertEquals(penaltyDue, period.getPenaltyChargesDue());
-        assertEquals(penaltyPaid, period.getPenaltyChargesPaid());
+        assertEquals(periodAmount, Utils.getDoubleValue(period.getTotalInstallmentAmountForPeriod()));
+        assertEquals(periodAmountPaid, Utils.getDoubleValue(period.getTotalPaidForPeriod()));
+        assertEquals(principalPaid, Utils.getDoubleValue(period.getPrincipalPaid()));
+        assertEquals(outstandingAmount, Utils.getDoubleValue(period.getTotalOutstandingForPeriod()));
+        assertEquals(feeDue, Utils.getDoubleValue(period.getFeeChargesDue()));
+        assertEquals(feePaid, Utils.getDoubleValue(period.getFeeChargesPaid()));
+        assertEquals(penaltyDue, Utils.getDoubleValue(period.getPenaltyChargesDue()));
+        assertEquals(penaltyPaid, Utils.getDoubleValue(period.getPenaltyChargesPaid()));
         assertEquals(isComplete, period.getComplete());
     }
 
@@ -842,7 +842,7 @@ public class LoanAccountPaymentAllocationWithOverlappingDownPaymentInstallmentTe
 
         String loanApplicationJSON = new LoanApplicationTestBuilder().withPrincipal("1000").withLoanTermFrequency("2")
                 .withLoanTermFrequencyAsMonths().withNumberOfRepayments("2").withRepaymentEveryAfter("1")
-                .withRepaymentFrequencyTypeAsMonths().withInterestRatePerPeriod("0").withInterestTypeAsFlatBalance()
+                .withRepaymentFrequencyTypeAsMonths().withInterestRatePerPeriod("0").withInterestTypeAsDecliningBalance()
                 .withAmortizationTypeAsEqualPrincipalPayments().withInterestCalculationPeriodTypeSameAsRepaymentPeriod()
                 .withExpectedDisbursementDate("03 March 2023").withSubmittedOnDate("03 March 2023").withLoanType("individual")
                 .withExternalId(externalId).withRepaymentStrategy(repaymentStartegy)

@@ -19,8 +19,6 @@
 package org.apache.fineract.integrationtests;
 
 import static java.lang.Boolean.TRUE;
-import static org.apache.fineract.infrastructure.businessdate.domain.BusinessDateType.BUSINESS_DATE;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -28,7 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.fineract.client.models.BusinessDateRequest;
+import org.apache.fineract.client.models.BusinessDateUpdateRequest;
 import org.apache.fineract.client.models.GetLoanProductsProductIdResponse;
 import org.apache.fineract.client.models.GetLoansLoanIdResponse;
 import org.apache.fineract.client.models.PostLoanProductsRequest;
@@ -81,20 +79,20 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                 verifyLoanDelinquencyNextPaymentDate(loanId, "01 November 2023", false);
 
                 // Update business date
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("13 November 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("13 November 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 13 Nov Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "16 November 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("16 November 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("16 November 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 16 Nov Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "01 December 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("01 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("01 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 01 Dec Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "16 December 2023", false);
@@ -112,14 +110,14 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                         installment(0.0, 0.0, 50.0, 50.0, false, "23 December 2023") //
                 );
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("17 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("17 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 17 Dec Business date N + 1
                 verifyLoanDelinquencyNextPaymentDate(loanId, "23 December 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("25 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("25 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
             } finally {
                 // reset global config
@@ -167,8 +165,8 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                 verifyLoanDelinquencyNextPaymentDate(loanId, "16 November 2023", false);
 
                 // Update business date
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("13 November 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("13 November 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 13 Nov Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "16 November 2023", false);
@@ -188,8 +186,8 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                 // delinquency next payment date for 13 Nov Business date after paying 16 November Installment
                 verifyLoanDelinquencyNextPaymentDate(loanId, "01 December 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("16 November 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("16 November 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 16 Nov Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "01 December 2023", false);
@@ -209,8 +207,8 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                 // delinquency next payment date for 16 Nov Business date after partial payment of 01 Dec installment
                 verifyLoanDelinquencyNextPaymentDate(loanId, "01 December 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("01 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("01 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 01 December Business date
                 verifyLoanDelinquencyNextPaymentDate(loanId, "16 December 2023", false);
@@ -228,14 +226,14 @@ public class LoanDelinquencyDetailsNextPaymentDateConfigurationTest extends Base
                         installment(0.0, 0.0, 50.0, 50.0, false, "23 December 2023") //
                 );
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("17 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("17 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
 
                 // delinquency next payment date for 17 Dec Business date N + 1
                 verifyLoanDelinquencyNextPaymentDate(loanId, "23 December 2023", false);
 
-                businessDateHelper.updateBusinessDate(new BusinessDateRequest().type(BUSINESS_DATE.getName()).date("25 December 2023")
-                        .dateFormat(DATETIME_PATTERN).locale("en"));
+                businessDateHelper.updateBusinessDate(new BusinessDateUpdateRequest().type(BusinessDateUpdateRequest.TypeEnum.BUSINESS_DATE)
+                        .date("25 December 2023").dateFormat(DATETIME_PATTERN).locale("en"));
             } finally {
                 // reset global config
                 globalConfigurationHelper.updateGlobalConfiguration(GlobalConfigurationConstants.NEXT_PAYMENT_DUE_DATE,

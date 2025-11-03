@@ -26,6 +26,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -931,6 +932,177 @@ public class BatchApiStepDef extends AbstractStepDef {
                 .isEqualTo(errorsDeveloperMessageExpected);
     }
 
+    @When("Admin runs Batch API call with chargeOff command on {string}")
+    public void runBatchApiCallWithChargeOffCommand(String chargeOffDate) throws IOException {
+        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanResponse.body().getLoanId();
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        List<BatchRequest> requestList = new ArrayList<>();
+
+        requestList.add(createChargeOffRequest(1L, loanId, idempotencyKey, chargeOffDate));
+
+        Response<List<BatchResponse>> batchResponseList = batchApiApi.handleBatchRequests(requestList, false).execute();
+        testContext().set(TestContextKey.BATCH_API_CALL_RESPONSE, batchResponseList);
+        testContext().set(TestContextKey.BATCH_API_CALL_IDEMPOTENCY_KEY, idempotencyKey);
+
+        if (batchResponseList.isSuccessful() && batchResponseList.body() != null && !batchResponseList.body().isEmpty()) {
+            BatchResponse response = batchResponseList.body().get(0);
+            log.debug("Batch charge-off API status code: {}", response.getStatusCode());
+            log.debug("Batch charge-off API response body: {}", response.getBody());
+        } else {
+            log.warn("Batch charge-off API call failed or returned empty response");
+        }
+    }
+
+    @When("Run Batch API with steps: createClient, createLoan, approveLoan, disburseLoan, applyInterestPause by external ids")
+    public void runBatchApiWithInterestPauseByExternalIds() throws IOException {
+        String idempotencyKey = UUID.randomUUID().toString();
+        String clientExternalId = UUID.randomUUID().toString();
+        String loanExternalId = UUID.randomUUID().toString();
+
+        List<BatchRequest> requestList = new ArrayList<>();
+
+        // Create client
+        requestList.add(createClient(1L, idempotencyKey, clientExternalId));
+
+        // Create loan
+        requestList.add(createProgressiveLoan(2L, 1L, idempotencyKey, loanExternalId));
+
+        // Approve loan
+        requestList.add(approveLoanByExternalId(3L, 2L, idempotencyKey));
+
+        // Disburse loan
+        PostLoansLoanIdRequest loanDisburseRequest = LoanRequestFactory.defaultLoanDisburseRequest();
+        String bodyLoanDisburseRequest = GSON.toJson(loanDisburseRequest);
+        BatchRequest disburseRequest = new BatchRequest();
+        disburseRequest.requestId(4L);
+        disburseRequest.relativeUrl("loans/external-id/$.resourceExternalId?command=disburse");
+        disburseRequest.method(BATCH_API_METHOD_POST);
+        disburseRequest.reference(2L);
+        disburseRequest.headers(setHeaders(idempotencyKey));
+        disburseRequest.body(bodyLoanDisburseRequest);
+        requestList.add(disburseRequest);
+
+        // Apply interest pause (1 day starting from tomorrow)
+        String startDate = DateTimeFormatter.ofPattern(DATE_FORMAT).format(Utils.now().minusMonths(1).plusDays(1));
+        String endDate = DateTimeFormatter.ofPattern(DATE_FORMAT).format(Utils.now().minusMonths(1).plusDays(2));
+        requestList.add(applyInterestPauseByExternalId(5L, 2L, idempotencyKey, startDate, endDate));
+
+        // Execute batch request
+        Response<List<BatchResponse>> batchResponseList = batchApiApi.handleBatchRequests(requestList, true).execute();
+        testContext().set(TestContextKey.BATCH_API_CALL_RESPONSE, batchResponseList);
+        testContext().set(TestContextKey.BATCH_API_CALL_IDEMPOTENCY_KEY, idempotencyKey);
+        testContext().set(TestContextKey.BATCH_API_CALL_CLIENT_EXTERNAL_ID, clientExternalId);
+        testContext().set(TestContextKey.BATCH_API_CALL_LOAN_EXTERNAL_ID, loanExternalId);
+
+        // Log response for debugging
+        if (batchResponseList.isSuccessful() && batchResponseList.body() != null && !batchResponseList.body().isEmpty()) {
+            for (int i = 0; i < batchResponseList.body().size(); i++) {
+                BatchResponse response = batchResponseList.body().get(i);
+                log.debug("Batch step {} status code: {}", i + 1, response.getStatusCode());
+                log.debug("Batch step {} response body: {}", i + 1, response.getBody());
+            }
+        } else {
+            log.warn("Batch API call failed or returned empty response");
+        }
+    }
+
+    @When("Run Batch API with steps: createClient, createLoan, approveLoan, disburseLoan, applyInterestPause")
+    public void runBatchApiWithInterestPause() throws IOException {
+        String idempotencyKey = UUID.randomUUID().toString();
+        String clientExternalId = UUID.randomUUID().toString();
+        String loanExternalId = UUID.randomUUID().toString();
+
+        List<BatchRequest> requestList = new ArrayList<>();
+
+        // Create client
+        requestList.add(createClient(1L, idempotencyKey, clientExternalId));
+
+        // Create loan
+        requestList.add(createProgressiveLoan(2L, 1L, idempotencyKey, loanExternalId));
+
+        // Approve loan
+        requestList.add(approveLoanByExternalId(3L, 2L, idempotencyKey));
+
+        // Disburse loan
+        PostLoansLoanIdRequest loanDisburseRequest = LoanRequestFactory.defaultLoanDisburseRequest();
+        String bodyLoanDisburseRequest = GSON.toJson(loanDisburseRequest);
+        BatchRequest disburseRequest = new BatchRequest();
+        disburseRequest.requestId(4L);
+        disburseRequest.relativeUrl("loans/$.loanId?command=disburse");
+        disburseRequest.method(BATCH_API_METHOD_POST);
+        disburseRequest.reference(2L);
+        disburseRequest.headers(setHeaders(idempotencyKey));
+        disburseRequest.body(bodyLoanDisburseRequest);
+        requestList.add(disburseRequest);
+
+        // Apply interest pause (1 day starting from tomorrow)
+        String startDate = DateTimeFormatter.ofPattern(DATE_FORMAT).format(Utils.now().minusMonths(1).plusDays(1));
+        String endDate = DateTimeFormatter.ofPattern(DATE_FORMAT).format(Utils.now().minusMonths(1).plusDays(2));
+        requestList.add(applyInterestPause(5L, 2L, idempotencyKey, startDate, endDate));
+
+        // Execute batch request
+        Response<List<BatchResponse>> batchResponseList = batchApiApi.handleBatchRequests(requestList, true).execute();
+        testContext().set(TestContextKey.BATCH_API_CALL_RESPONSE, batchResponseList);
+        testContext().set(TestContextKey.BATCH_API_CALL_IDEMPOTENCY_KEY, idempotencyKey);
+        testContext().set(TestContextKey.BATCH_API_CALL_CLIENT_EXTERNAL_ID, clientExternalId);
+        testContext().set(TestContextKey.BATCH_API_CALL_LOAN_EXTERNAL_ID, loanExternalId);
+
+        // Log response for debugging
+        if (batchResponseList.isSuccessful() && batchResponseList.body() != null && !batchResponseList.body().isEmpty()) {
+            for (int i = 0; i < batchResponseList.body().size(); i++) {
+                BatchResponse response = batchResponseList.body().get(i);
+                log.debug("Batch step {} status code: {}", i + 1, response.getStatusCode());
+                log.debug("Batch step {} response body: {}", i + 1, response.getBody());
+            }
+        } else {
+            log.warn("Batch API call failed or returned empty response");
+        }
+    }
+
+    private BatchRequest createChargeOffRequest(Long requestId, Long loanId, String idempotencyKey, String chargeOffDate) {
+        // Create a charge-off request with the specified date
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("transactionDate", chargeOffDate);
+        requestMap.put("dateFormat", DATE_FORMAT);
+        requestMap.put("locale", DEFAULT_LOCALE);
+        requestMap.put("note", "Charge-off due to delinquency");
+
+        String bodyChargeOffRequest = GSON.toJson(requestMap);
+
+        Set<Header> headers = new HashSet<>();
+        headers.add(HEADER);
+        if (idempotencyKey != null) {
+            headers.add(new Header().name("Idempotency-Key").value(idempotencyKey));
+        }
+
+        BatchRequest batchRequest = new BatchRequest();
+        batchRequest.requestId(requestId);
+        batchRequest.relativeUrl("loans/" + loanId + "/transactions?command=charge-off");
+        batchRequest.method(BATCH_API_METHOD_POST);
+        batchRequest.headers(headers);
+        batchRequest.body(bodyChargeOffRequest);
+
+        return batchRequest;
+    }
+
+    @Then("Admin checks the loan has been charged-off on {string}")
+    public void checkLoanChargedOff(String chargeOffDate) throws IOException {
+        Response<PostLoansResponse> loanResponse = testContext().get(TestContextKey.LOAN_CREATE_RESPONSE);
+        long loanId = loanResponse.body().getLoanId();
+
+        Response<GetLoansLoanIdResponse> loanDetails = loansApi.retrieveLoan(loanId, false, "all", "", "").execute();
+        ErrorHelper.checkSuccessfulApiCall(loanDetails);
+
+        // Check loan has a CHARGE_OFF transaction on the specified date
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
+        boolean hasChargeOffTransaction = loanDetails.body().getTransactions().stream().anyMatch(
+                t -> t.getType().getCode().equals("loanTransactionType.chargeOff") && formatter.format(t.getDate()).equals(chargeOffDate));
+
+        assertThat(hasChargeOffTransaction).as("Loan should have a CHARGE_OFF transaction on " + chargeOffDate).isTrue();
+    }
+
     private String getHeaderValueByHeaderKey(List<Header> headersList, String headerKey) {
         for (Header header : headersList) {
             if (Objects.requireNonNull(header.getName()).equals(headerKey)) {
@@ -964,6 +1136,24 @@ public class BatchApiStepDef extends AbstractStepDef {
     private BatchRequest createLoan(Long requestId, Long referenceId, String idempotencyKey, String loanExternalId) {
         PostLoansRequest loansRequest = loanExternalId == null ? loanRequestFactory.defaultLoansRequest(1L)
                 : loanRequestFactory.defaultLoansRequest(1L).externalId(loanExternalId);
+        String bodyLoansRequest = GSON.toJson(loansRequest);
+        String bodyLoansRequestMod = bodyLoansRequest.replace("\"clientId\":1", "\"clientId\":\"$.clientId\"");
+
+        BatchRequest batchRequest = new BatchRequest();
+        batchRequest.requestId(requestId);
+        batchRequest.relativeUrl(BATCH_API_SAMPLE_RELATIVE_URL_LOANS);
+        batchRequest.method(BATCH_API_METHOD_POST);
+        batchRequest.headers(setHeaders(idempotencyKey));
+        batchRequest.reference(referenceId);
+        batchRequest.body(bodyLoansRequestMod);
+
+        return batchRequest;
+    }
+
+    private BatchRequest createProgressiveLoan(Long requestId, Long referenceId, String idempotencyKey, String loanExternalId) {
+        PostLoansRequest loansRequest = loanExternalId == null ? loanRequestFactory.defaultProgressiveLoansRequest(1L)
+                : loanRequestFactory.defaultProgressiveLoansRequest(1L).externalId(loanExternalId);
+        loansRequest.setInterestRatePerPeriod(BigDecimal.ONE);
         String bodyLoansRequest = GSON.toJson(loansRequest);
         String bodyLoansRequestMod = bodyLoansRequest.replace("\"clientId\":1", "\"clientId\":\"$.clientId\"");
 
@@ -1048,6 +1238,37 @@ public class BatchApiStepDef extends AbstractStepDef {
         return batchRequest;
     }
 
+    private BatchRequest applyInterestPause(Long requestId, Long referenceId, String idempotencyKey, String startDate, String endDate) {
+        BatchRequest batchRequest = new BatchRequest();
+        batchRequest.requestId(requestId);
+        batchRequest.relativeUrl("loans/$.loanId/interest-pauses");
+        batchRequest.method(BATCH_API_METHOD_POST);
+        batchRequest.reference(referenceId);
+        batchRequest.headers(setHeaders(idempotencyKey));
+
+        String interestPauseRequest = String
+                .format("{\"dateFormat\":\"dd MMMM yyyy\",\"locale\":\"en\",\"startDate\":\"%s\",\"endDate\":\"%s\"}", startDate, endDate);
+        batchRequest.body(interestPauseRequest);
+
+        return batchRequest;
+    }
+
+    private BatchRequest applyInterestPauseByExternalId(Long requestId, Long referenceId, String idempotencyKey, String startDate,
+            String endDate) {
+        BatchRequest batchRequest = new BatchRequest();
+        batchRequest.requestId(requestId);
+        batchRequest.relativeUrl("loans/external-id/$.resourceExternalId/interest-pauses");
+        batchRequest.method(BATCH_API_METHOD_POST);
+        batchRequest.reference(referenceId);
+        batchRequest.headers(setHeaders(idempotencyKey));
+
+        String interestPauseRequest = String
+                .format("{\"dateFormat\":\"dd MMMM yyyy\",\"locale\":\"en\",\"startDate\":\"%s\",\"endDate\":\"%s\"}", startDate, endDate);
+        batchRequest.body(interestPauseRequest);
+
+        return batchRequest;
+    }
+
     private Set<Header> setHeaders(String idempotencyKey) {
         Set<Header> headers = new HashSet<>();
         headers.add(HEADER);
@@ -1056,5 +1277,44 @@ public class BatchApiStepDef extends AbstractStepDef {
         }
 
         return headers;
+    }
+
+    @Then("Loan should have an active interest pause period starting on {int}st day and ending on {int}nd day")
+    public void verifyInterestPausePeriod(int startDay, int endDay) throws IOException {
+        // Get the loan ID from the batch response
+        Response<List<BatchResponse>> batchResponseList = testContext().get(TestContextKey.BATCH_API_CALL_RESPONSE);
+        assertThat(batchResponseList.isSuccessful()).isTrue();
+        assertThat(batchResponseList.body()).isNotNull();
+
+        // The loan creation response is the second response in the batch (index 1)
+        BatchResponse loanCreateResponse = batchResponseList.body().get(1);
+        assertThat(loanCreateResponse.getStatusCode()).isEqualTo(200);
+
+        // Parse the loan ID from the response
+        String loanCreateResponseBody = loanCreateResponse.getBody();
+        com.google.gson.JsonObject loanCreateJson = com.google.gson.JsonParser.parseString(loanCreateResponseBody).getAsJsonObject();
+        long loanId = loanCreateJson.get("loanId").getAsLong();
+
+        // Get the loan details
+        Response<GetLoansLoanIdResponse> loanResponse = loansApi.retrieveLoan(loanId, false, "all", "", "").execute();
+        assertThat(loanResponse.isSuccessful()).isTrue();
+        assertThat(loanResponse.body()).isNotNull();
+
+        // Verify the interest pause period
+        GetLoansLoanIdResponse loan = loanResponse.body();
+        assertThat(loan.getLoanTermVariations().get(0).getTermType().getValue().equals("interestPause")).isTrue();
+
+        // Verify the start date is the specified day of the previous month
+        LocalDate today = Utils.now();
+        LocalDate expectedStartDate = today.minusMonths(1).plusDays(startDay);
+        LocalDate actualStartDate = loan.getLoanTermVariations().get(0).getTermVariationApplicableFrom();
+        assertThat(actualStartDate).isEqualTo(expectedStartDate);
+
+        // Verify the end date is the specified day of the previous month
+        LocalDate expectedEndDate = today.minusMonths(1).plusDays(endDay);
+        LocalDate actualEndDate = loan.getLoanTermVariations().get(0).getDateValue();
+        assertThat(actualEndDate).isEqualTo(expectedEndDate);
+
+        log.debug("Verified interest pause period from {} to {}", actualStartDate, actualEndDate);
     }
 }

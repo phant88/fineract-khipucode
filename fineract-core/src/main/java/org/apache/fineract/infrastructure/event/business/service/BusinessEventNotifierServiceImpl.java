@@ -34,9 +34,9 @@ import org.apache.fineract.infrastructure.event.business.BusinessEventListener;
 import org.apache.fineract.infrastructure.event.business.domain.BulkBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.BusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.NoExternalEvent;
-import org.apache.fineract.infrastructure.event.external.repository.ExternalEventConfigurationRepository;
 import org.apache.fineract.infrastructure.event.external.service.ExternalEventService;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionExecution;
 import org.springframework.transaction.TransactionExecutionListener;
@@ -56,10 +56,10 @@ public class BusinessEventNotifierServiceImpl implements BusinessEventNotifierSe
     private final ThreadLocal<List<BusinessEvent<?>>> recordedEvents = ThreadLocal.withInitial(ArrayList::new);
 
     private final ExternalEventService externalEventService;
-    private final ExternalEventConfigurationRepository eventConfigurationRepository;
     private final FineractProperties fineractProperties;
     private final ThreadLocal<Stack<List<BusinessEventWithContext>>> transactionBusinessEvents = ThreadLocal.withInitial(Stack::new);
     private final TransactionHelper transactionHelper;
+    private final ExternalBusinessEventConfigurationService externalBusinessEventConfigurationService;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -100,7 +100,7 @@ public class BusinessEventNotifierServiceImpl implements BusinessEventNotifierSe
         }
         if (isExternalEvent && isExternalEventPostingEnabled()) {
             // we only want to create external events for operations that were successful, hence the post listener
-            if (isExternalEventConfiguredForPosting(businessEvent.getType())) {
+            if (externalBusinessEventConfigurationService.isExternalEventConfiguredForPosting(businessEvent)) {
                 if (isExternalEventRecordingEnabled()) {
                     recordedEvents.get().add(businessEvent);
                 } else {
@@ -141,10 +141,6 @@ public class BusinessEventNotifierServiceImpl implements BusinessEventNotifierSe
 
     private boolean isExternalEventPostingEnabled() {
         return fineractProperties.getEvents().getExternal().isEnabled();
-    }
-
-    private boolean isExternalEventConfiguredForPosting(String eventType) {
-        return eventConfigurationRepository.findExternalEventConfigurationByTypeWithNotFoundDetection(eventType).isEnabled();
     }
 
     private void throwExceptionIfBulkEvent(BusinessEvent<?> businessEvent) {
@@ -203,19 +199,29 @@ public class BusinessEventNotifierServiceImpl implements BusinessEventNotifierSe
     }
 
     @Override
-    public void beforeCommit(TransactionExecution transaction) {
-        List<BusinessEventWithContext> businessEventWithContexts = transactionBusinessEvents.get().peek();
-        if (!businessEventWithContexts.isEmpty()) {
-            FineractContext originalContext = ThreadLocalContextUtil.getContext();
-            try {
-                for (BusinessEventWithContext businessEventWithContext : businessEventWithContexts) {
-                    ThreadLocalContextUtil.init(businessEventWithContext.getFineractContext());
-                    externalEventService.postEvent(businessEventWithContext.getEvent());
-                }
-            } finally {
-                ThreadLocalContextUtil.init(originalContext);
-            }
+    public void beforeCommit(@NonNull final TransactionExecution transaction) {
+        final List<BusinessEventWithContext> businessEventWithContexts = transactionBusinessEvents.get().peek();
+        if (businessEventWithContexts.isEmpty()) {
+            return;
         }
+        final FineractContext originalContext = ThreadLocalContextUtil.getContext();
+        businessEventWithContexts.forEach(businessEventWithContext -> {
+            final FineractContext currentContext = businessEventWithContext.getFineractContext();
+            boolean swappedContext = false;
+            try {
+                if (!originalContext.equals(currentContext)) {
+                    swappedContext = true;
+                    ThreadLocalContextUtil.init(currentContext);
+                }
+                externalEventService.postEvent(businessEventWithContext.getEvent());
+            } finally {
+                // Back to original context if we swapped it. We should restore the original context rather than reset
+                // it completely
+                if (swappedContext) {
+                    ThreadLocalContextUtil.init(originalContext);
+                }
+            }
+        });
     }
 
     @Override

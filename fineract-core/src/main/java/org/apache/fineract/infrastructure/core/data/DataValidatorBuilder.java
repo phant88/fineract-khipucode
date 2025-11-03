@@ -30,6 +30,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.validate.ValidationException;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
@@ -493,7 +494,7 @@ public class DataValidatorBuilder {
             final Integer intValue = Integer.valueOf(this.value.toString());
             if (!intValue.equals(number)) {
                 String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".not.equal.to.specified.number";
-                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be same as" + number;
+                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be same as " + number;
                 final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter,
                         intValue, number);
                 this.dataValidationErrors.add(error);
@@ -530,13 +531,20 @@ public class DataValidatorBuilder {
         }
 
         if (this.value != null) {
-            final long number = Long.parseLong(this.value.toString());
-            if (number < 1) {
-                String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".not.greater.than.zero";
-                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be greater than 0.";
-                final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter,
-                        number, 0);
-                this.dataValidationErrors.add(error);
+            try {
+                final long number = Long.parseLong(this.value.toString());
+                if (number < 1) {
+                    String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".not.greater.than.zero";
+                    String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be greater than 0.";
+                    final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage,
+                            this.parameter, number, 0);
+                    this.dataValidationErrors.add(error);
+                }
+            } catch (NumberFormatException e) {
+                String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".not.a.number";
+                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be a number.";
+                this.dataValidationErrors.add(ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter));
+                throwValidationErrors();
             }
         }
         return this;
@@ -608,6 +616,21 @@ public class DataValidatorBuilder {
 
         final Object[] array = (Object[]) this.value;
         if (ObjectUtils.isEmpty(array)) {
+            String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".cannot.be.empty";
+            String defaultEnglishMessage = "The parameter `" + this.parameter + "` cannot be empty. You must select at least one.";
+            final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter);
+            this.dataValidationErrors.add(error);
+        }
+        return this;
+    }
+
+    public DataValidatorBuilder listNotEmpty() {
+        if (this.value == null && this.ignoreNullValue) {
+            return this;
+        }
+
+        final List<Object> list = (List<Object>) this.value;
+        if (CollectionUtils.isEmpty(list)) {
             String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".cannot.be.empty";
             String defaultEnglishMessage = "The parameter `" + this.parameter + "` cannot be empty. You must select at least one.";
             final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter);
@@ -967,7 +990,7 @@ public class DataValidatorBuilder {
             final LocalDate dateVal = (LocalDate) this.value;
             if (DateUtils.isAfter(date, dateVal)) {
                 String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".is.less.than.date";
-                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be greater than the provided date" + date;
+                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be greater than the provided date " + date;
                 final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter,
                         dateVal, date);
                 this.dataValidationErrors.add(error);
@@ -986,6 +1009,25 @@ public class DataValidatorBuilder {
             if (DateUtils.isBefore(date, dateVal)) {
                 String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".is.greater.than.date";
                 String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be less than the provided date" + date;
+                final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter,
+                        dateVal, date);
+                this.dataValidationErrors.add(error);
+            }
+        }
+        return this;
+    }
+
+    public DataValidatorBuilder validateDateAfterOrEqual(final LocalDate date) {
+        if (this.value == null && this.ignoreNullValue) {
+            return this;
+        }
+
+        if (this.value != null && date != null) {
+            final LocalDate dateVal = (LocalDate) this.value;
+            if (DateUtils.isBefore(dateVal, date)) {
+                String validationErrorCode = "validation.msg." + this.resource + "." + this.parameter + ".is.before.than.date";
+                String defaultEnglishMessage = "The parameter `" + this.parameter + "` must be greater than or equal to the provided date: "
+                        + date;
                 final ApiParameterError error = ApiParameterError.parameterError(validationErrorCode, defaultEnglishMessage, this.parameter,
                         dateVal, date);
                 this.dataValidationErrors.add(error);

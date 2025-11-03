@@ -55,19 +55,28 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.accounting.common.AccountingConstants;
 import org.apache.fineract.accounting.journalentry.domain.JournalEntryType;
+import org.apache.fineract.client.models.ExternalAssetOwnerRequest;
 import org.apache.fineract.client.models.ExternalOwnerJournalEntryData;
 import org.apache.fineract.client.models.ExternalOwnerTransferJournalEntryData;
 import org.apache.fineract.client.models.ExternalTransferData;
 import org.apache.fineract.client.models.GetFinancialActivityAccountsResponse;
+import org.apache.fineract.client.models.GetJournalEntriesTransactionIdResponse;
+import org.apache.fineract.client.models.JournalEntryCommand;
+import org.apache.fineract.client.models.JournalEntryTransactionItem;
 import org.apache.fineract.client.models.PageExternalTransferData;
 import org.apache.fineract.client.models.PostFinancialActivityAccountsRequest;
-import org.apache.fineract.client.models.PostInitiateTransferRequest;
 import org.apache.fineract.client.models.PostInitiateTransferResponse;
+import org.apache.fineract.client.models.PostJournalEntriesResponse;
+import org.apache.fineract.client.models.PostLoanProductsResponse;
+import org.apache.fineract.client.models.PostLoansLoanIdRequest;
 import org.apache.fineract.client.models.PostLoansLoanIdTransactionsRequest;
+import org.apache.fineract.client.models.PostLoansRequest;
+import org.apache.fineract.client.models.PostLoansResponse;
 import org.apache.fineract.client.models.PutGlobalConfigurationsRequest;
+import org.apache.fineract.client.models.SingleDebitOrCreditEntryCommand;
 import org.apache.fineract.client.util.CallFailedRuntimeException;
 import org.apache.fineract.infrastructure.configuration.api.GlobalConfigurationConstants;
-import org.apache.fineract.infrastructure.event.external.service.validation.ExternalEventDTO;
+import org.apache.fineract.infrastructure.event.external.data.ExternalEventResponse;
 import org.apache.fineract.integrationtests.BaseLoanIntegrationTest;
 import org.apache.fineract.integrationtests.common.BusinessDateHelper;
 import org.apache.fineract.integrationtests.common.BusinessStepHelper;
@@ -80,6 +89,7 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.integrationtests.common.accounting.AccountHelper;
 import org.apache.fineract.integrationtests.common.accounting.FinancialActivityAccountHelper;
+import org.apache.fineract.integrationtests.common.accounting.JournalEntryHelper;
 import org.apache.fineract.integrationtests.common.charges.ChargesHelper;
 import org.apache.fineract.integrationtests.common.externalevents.ExternalEventHelper;
 import org.apache.fineract.integrationtests.common.externalevents.ExternalEventsExtension;
@@ -88,12 +98,13 @@ import org.apache.fineract.integrationtests.common.loans.LoanProductTestBuilder;
 import org.apache.fineract.integrationtests.common.loans.LoanStatusChecker;
 import org.apache.fineract.integrationtests.common.loans.LoanTransactionHelper;
 import org.apache.fineract.integrationtests.common.report.ReportHelper;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanStatus;
 import org.hamcrest.Matchers;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.lang.NonNull;
 
 @SuppressWarnings("rawtypes")
 @ExtendWith({ ExternalEventsExtension.class })
@@ -226,7 +237,7 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
                             new BigDecimal("757.420000"), new BigDecimal("10.000000"), new BigDecimal("0.000000"),
                             new BigDecimal("0.000000")));
 
-            List<ExternalEventDTO> allExternalEvents = ExternalEventHelper.getAllExternalEvents(REQUEST_SPEC, RESPONSE_SPEC);
+            List<ExternalEventResponse> allExternalEvents = ExternalEventHelper.getAllExternalEvents(REQUEST_SPEC, RESPONSE_SPEC);
             Assertions.assertEquals(1, allExternalEvents.size());
             Assertions.assertEquals("LoanOwnershipTransferBusinessEvent", allExternalEvents.get(0).getType());
             Assertions.assertEquals(Long.valueOf(loanID), allExternalEvents.get(0).getAggregateRootId());
@@ -631,9 +642,12 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
 
             LOAN_TRANSACTION_HELPER.makeRepayment("04 March 2020", 16000.0f, loanID);
 
+            HashMap loanStatusHashMap = LoanStatusChecker.getStatusOfLoan(REQUEST_SPEC, RESPONSE_SPEC, loanID);
+            LoanStatus loanStatus = LoanStatus.fromInt((Integer) loanStatusHashMap.get("id"));
+
             CallFailedRuntimeException exception = assertThrows(CallFailedRuntimeException.class,
                     () -> createSaleTransfer(loanID, "2020-03-02"));
-            assertTrue(exception.getMessage().contains("Loan is not in active status"));
+            assertTrue(exception.getMessage().contains(String.format("Loan status %s is not valid for transfer.", loanStatus)));
         } finally {
             cleanUpAndRestoreBusinessDate();
         }
@@ -684,8 +698,8 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
                             new BigDecimal("757.420000"), new BigDecimal("0.000000"), new BigDecimal("0.000000"),
                             new BigDecimal("0.000000")),
                     ExpectedExternalTransferData.expected(BUYBACK, buybackTransferResponse.getResourceExternalId(), "2020-03-06",
-                            "2020-03-05", "2020-03-05", true, new BigDecimal("15757.420000"), new BigDecimal("15000.000000"),
-                            new BigDecimal("757.420000"), new BigDecimal("0.000000"), new BigDecimal("0.000000"),
+                            "2020-03-05", "2020-03-05", true, new BigDecimal("0.000000"), new BigDecimal("0.000000"),
+                            new BigDecimal("0.000000"), new BigDecimal("0.000000"), new BigDecimal("0.000000"),
                             new BigDecimal("0.000000")));
             getAndValidateThereIsNoActiveMapping(saleTransferResponse.getResourceExternalId());
         } finally {
@@ -868,10 +882,12 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
             assertTrue(exception5.getMessage().contains("Loan with identifier -1 does not exist"));
 
             String externalId = UUID.randomUUID().toString();
+            String transferExternalGroupId = UUID.randomUUID().toString();
+
             CallFailedRuntimeException exception6 = assertThrows(CallFailedRuntimeException.class, () -> {
                 Integer clientID = createClient();
                 Integer loanID = createLoanForClient(clientID);
-                createSaleTransfer(loanID, "2020-03-03", externalId, "1", "1.0");
+                createSaleTransfer(loanID, "2020-03-03", externalId, transferExternalGroupId, "1", "1.0");
                 createBuybackTransfer(loanID, "2020-03-02", externalId);
             });
             assertTrue(exception6.getMessage()
@@ -892,12 +908,12 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
             CallFailedRuntimeException exception = assertThrows(CallFailedRuntimeException.class, () -> createSaleTransfer(loanID, null));
             assertTrue(exception.getMessage().contains("The parameter `settlementDate` is mandatory."));
 
-            CallFailedRuntimeException exception2 = assertThrows(CallFailedRuntimeException.class,
-                    () -> createSaleTransfer(loanID, "2020-03-02", UUID.randomUUID().toString(), null, "1.0"));
+            CallFailedRuntimeException exception2 = assertThrows(CallFailedRuntimeException.class, () -> createSaleTransfer(loanID,
+                    "2020-03-02", UUID.randomUUID().toString(), UUID.randomUUID().toString(), null, "1.0"));
             assertTrue(exception2.getMessage().contains("The parameter `ownerExternalId` is mandatory."));
 
             CallFailedRuntimeException exception3 = assertThrows(CallFailedRuntimeException.class,
-                    () -> createSaleTransfer(loanID, "2020-03-02", null, UUID.randomUUID().toString(), null));
+                    () -> createSaleTransfer(loanID, "2020-03-02", null, UUID.randomUUID().toString(), UUID.randomUUID().toString(), null));
             assertTrue(exception3.getMessage().contains("The parameter `purchasePriceRatio` is mandatory."));
 
             CallFailedRuntimeException exception4 = assertThrows(CallFailedRuntimeException.class,
@@ -918,10 +934,11 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
             });
             assertTrue(exception6.getMessage().contains("This loan cannot be sold, because it is owned by an external asset owner"));
             String externalId = UUID.randomUUID().toString();
+            String transferExternalGroupId = UUID.randomUUID().toString();
             CallFailedRuntimeException exception7 = assertThrows(CallFailedRuntimeException.class, () -> {
                 Integer loanID2 = createLoanForClient(clientID);
-                createSaleTransfer(loanID2, "2020-03-05", externalId, "1", "1.0");
-                createSaleTransfer(loanID2, "2020-03-05", externalId, "1", "1.0");
+                createSaleTransfer(loanID2, "2020-03-05", externalId, transferExternalGroupId, "1", "1.0");
+                createSaleTransfer(loanID2, "2020-03-05", externalId, transferExternalGroupId, "1", "1.0");
             });
             assertTrue(exception7.getMessage()
                     .contains(String.format("Already existing an asset transfer with the provided transfer external id: %s", externalId)));
@@ -967,12 +984,10 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
                             new BigDecimal("0.000000")));
 
             final var allExternalEvents = ExternalEventHelper.getAllExternalEvents(REQUEST_SPEC, RESPONSE_SPEC);
-            Assertions.assertEquals(1, allExternalEvents.size());
-            Assertions.assertEquals("LoanOwnershipTransferBusinessEvent", allExternalEvents.get(0).getType());
-            Assertions.assertEquals(Long.valueOf(loanID), allExternalEvents.get(0).getAggregateRootId());
-
-            ExternalEventHelper.deleteAllExternalEvents(REQUEST_SPEC, new ResponseSpecBuilder().expectStatusCode(Matchers.is(204)).build());
-            ExternalEventHelper.changeEventState(REQUEST_SPEC, RESPONSE_SPEC, "LoanOwnershipTransferBusinessEvent", true);
+            List<ExternalEventResponse> loanOwnershipTransferBusinessEvents = allExternalEvents.stream()
+                    .filter(e -> e.getType().equals("LoanOwnershipTransferBusinessEvent")).toList();
+            Assertions.assertEquals(1, loanOwnershipTransferBusinessEvents.size());
+            Assertions.assertEquals(Long.valueOf(loanID), loanOwnershipTransferBusinessEvents.get(0).getAggregateRootId());
 
             getAndValidateThereIsActiveMapping(loanID);
 
@@ -1167,8 +1182,72 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
             assertEquals(0.00, jsonPath.getDouble("data[8].row[8]"), 0.01);
             assertEquals(ownerId, jsonPath.getString("data[8].row[9]"));
         } finally {
+            ExternalEventHelper.deleteAllExternalEvents(REQUEST_SPEC, new ResponseSpecBuilder().expectStatusCode(Matchers.is(204)).build());
             cleanUpAndRestoreBusinessDate();
         }
+    }
+
+    @Test
+    public void addManualJournalEntriesWithAssetExternalization() {
+        runAt("10 April 2025", () -> {
+
+            final Account glAccountDebit = accountHelper.createAssetAccount();
+            final Account glAccountCredit = accountHelper.createLiabilityAccount();
+            final String externalAssetOwner = Utils.uniqueRandomStringGenerator("ASSET_EXTERNAL_", 5);
+
+            CallFailedRuntimeException callFailedRuntimeException = Assertions.assertThrows(CallFailedRuntimeException.class,
+                    () -> JournalEntryHelper.createJournalEntry("", new JournalEntryCommand().amount(BigDecimal.TEN).officeId(1L)
+                            .currencyCode("USD").locale("en").dateFormat("uuuu-MM-dd").transactionDate(LocalDate.of(2024, 1, 1))
+                            .addCreditsItem(new SingleDebitOrCreditEntryCommand().glAccountId(glAccountDebit.getAccountID().longValue())
+                                    .amount(BigDecimal.TEN))
+                            .addDebitsItem(new SingleDebitOrCreditEntryCommand().glAccountId(glAccountCredit.getAccountID().longValue())
+                                    .amount(BigDecimal.TEN))
+                            .externalAssetOwner(externalAssetOwner)));
+            Assertions.assertTrue(callFailedRuntimeException.getMessage().contains("External asset owner with external id:"));
+
+            final Integer clientId = ClientHelper.createClient(requestSpec, responseSpec);
+            final String operationDate = "10 April 2025";
+
+            PostLoanProductsResponse loanProductResponse = loanProductHelper.createLoanProduct(
+                    createOnePeriod30DaysPeriodicAccrualProductWithAdvancedPaymentAllocationAndInterestRecalculation(12.0, 4));
+
+            final PostLoansRequest applicationRequest = applyLoanRequest(clientId.longValue(), loanProductResponse.getResourceId(),
+                    operationDate, 1000.0, 4).transactionProcessingStrategyCode("advanced-payment-allocation-strategy")//
+                    .interestRatePerPeriod(BigDecimal.valueOf(12.0));
+
+            final PostLoansResponse loanResponse = loanTransactionHelper.applyLoan(applicationRequest);
+            final Long loanId = loanResponse.getLoanId();
+
+            loanTransactionHelper.approveLoan(loanId, new PostLoansLoanIdRequest().approvedLoanAmount(BigDecimal.valueOf(1000.0))
+                    .dateFormat(DATETIME_PATTERN).approvedOnDate(operationDate).locale("en"));
+
+            loanTransactionHelper.disburseLoan(loanId, new PostLoansLoanIdRequest().actualDisbursementDate(operationDate)
+                    .dateFormat(DATETIME_PATTERN).transactionAmount(BigDecimal.valueOf(1000.0)).locale("en"));
+
+            PostInitiateTransferResponse transferResponse = EXTERNAL_ASSET_OWNER_HELPER.initiateTransferByLoanId(loanId, "sale",
+                    new ExternalAssetOwnerRequest().settlementDate("2025-04-20").dateFormat("yyyy-MM-dd").locale("en")
+                            .transferExternalId(externalAssetOwner).transferExternalGroupId(null).ownerExternalId(externalAssetOwner)
+                            .purchasePriceRatio("0.90"));
+            assertEquals(externalAssetOwner, transferResponse.getResourceExternalId());
+
+            final PostJournalEntriesResponse journalEntriesResponse = JournalEntryHelper.createJournalEntry("",
+                    new JournalEntryCommand().amount(BigDecimal.TEN).officeId(1L).currencyCode("USD").locale("en").dateFormat("uuuu-MM-dd")
+                            .transactionDate(LocalDate.of(2024, 1, 1))
+                            .addCreditsItem(new SingleDebitOrCreditEntryCommand().glAccountId(glAccountDebit.getAccountID().longValue())
+                                    .amount(BigDecimal.TEN))
+                            .addDebitsItem(new SingleDebitOrCreditEntryCommand().glAccountId(glAccountCredit.getAccountID().longValue())
+                                    .amount(BigDecimal.TEN))
+                            .externalAssetOwner(externalAssetOwner));
+
+            final GetJournalEntriesTransactionIdResponse journalEntriesTransactionIdResponse = JournalEntryHelper
+                    .retrieveJournalEntryByTransactionId(journalEntriesResponse.getTransactionId());
+            Assertions.assertNotNull(journalEntriesTransactionIdResponse);
+            assertEquals(2, journalEntriesTransactionIdResponse.getPageItems().size());
+            JournalEntryTransactionItem journalEntryItem = journalEntriesTransactionIdResponse.getPageItems().get(0);
+            assertEquals(externalAssetOwner, journalEntryItem.getExternalAssetOwner());
+            journalEntryItem = journalEntriesTransactionIdResponse.getPageItems().get(1);
+            assertEquals(externalAssetOwner, journalEntryItem.getExternalAssetOwner());
+        });
     }
 
     private void updateBusinessDateAndExecuteCOBJob(String date) {
@@ -1178,15 +1257,17 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
 
     private PostInitiateTransferResponse createSaleTransfer(Integer loanID, String settlementDate) {
         String transferExternalId = UUID.randomUUID().toString();
+        String transferExternalGroupId = UUID.randomUUID().toString();
         ownerExternalId = UUID.randomUUID().toString();
-        return createSaleTransfer(loanID, settlementDate, transferExternalId, ownerExternalId, "1.0");
+        return createSaleTransfer(loanID, settlementDate, transferExternalId, transferExternalGroupId, ownerExternalId, "1.0");
     }
 
     private PostInitiateTransferResponse createSaleTransfer(Integer loanID, String settlementDate, String transferExternalId,
-            String ownerExternalId, String purchasePriceRatio) {
+            String transferExternalGroupId, String ownerExternalId, String purchasePriceRatio) {
         PostInitiateTransferResponse saleResponse = EXTERNAL_ASSET_OWNER_HELPER.initiateTransferByLoanId(loanID.longValue(), "sale",
-                new PostInitiateTransferRequest().settlementDate(settlementDate).dateFormat("yyyy-MM-dd").locale("en")
-                        .transferExternalId(transferExternalId).ownerExternalId(ownerExternalId).purchasePriceRatio(purchasePriceRatio));
+                new ExternalAssetOwnerRequest().settlementDate(settlementDate).dateFormat("yyyy-MM-dd").locale("en")
+                        .transferExternalId(transferExternalId).transferExternalGroupId(transferExternalGroupId)
+                        .ownerExternalId(ownerExternalId).purchasePriceRatio(purchasePriceRatio));
         assertEquals(transferExternalId, saleResponse.getResourceExternalId());
         return saleResponse;
     }
@@ -1198,7 +1279,7 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
 
     private PostInitiateTransferResponse createBuybackTransfer(Integer loanID, String settlementDate, String transferExternalId) {
         PostInitiateTransferResponse saleResponse = EXTERNAL_ASSET_OWNER_HELPER.initiateTransferByLoanId(loanID.longValue(), "buyback",
-                new PostInitiateTransferRequest().settlementDate(settlementDate).dateFormat("yyyy-MM-dd").locale("en")
+                new ExternalAssetOwnerRequest().settlementDate(settlementDate).dateFormat("yyyy-MM-dd").locale("en")
                         .transferExternalId(transferExternalId));
         assertEquals(transferExternalId, saleResponse.getResourceExternalId());
         return saleResponse;
@@ -1230,14 +1311,14 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
         globalConfigurationHelper.manageConfigurations(GlobalConfigurationConstants.ENABLE_AUTO_GENERATED_EXTERNAL_ID, false);
     }
 
-    @NotNull
+    @NonNull
     private Integer createClient() {
         final Integer clientID = ClientHelper.createClient(REQUEST_SPEC, RESPONSE_SPEC);
         Assertions.assertNotNull(clientID);
         return clientID;
     }
 
-    @NotNull
+    @NonNull
     private Integer createLoanForClient(Integer clientID) {
         Integer overdueFeeChargeId = ChargesHelper.createCharges(REQUEST_SPEC, RESPONSE_SPEC,
                 ChargesHelper.getLoanOverdueFeeJSONWithCalculationTypePercentage("1"));
@@ -1286,8 +1367,8 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
                 .withLoanTermFrequencyAsMonths().withNumberOfRepayments("4").withRepaymentEveryAfter("1")
                 .withRepaymentFrequencyTypeAsMonths().withInterestRatePerPeriod("2").withAmortizationTypeAsEqualInstallments()
                 .withInterestTypeAsDecliningBalance().withInterestCalculationPeriodTypeSameAsRepaymentPeriod()
-                .withExpectedDisbursementDate(date).withSubmittedOnDate(date).withCollaterals(collaterals)
-                .build(clientID, loanProductID, null);
+                .withExpectedDisbursementDate(date).withSubmittedOnDate(date).withCollaterals(collaterals).withInArrearsTolerance("0")
+                .withPrincipalGrace("0").withInterestGrace("0").build(clientID, loanProductID, null);
         return LOAN_TRANSACTION_HELPER.getLoanId(loanApplicationJSON);
     }
 
@@ -1315,6 +1396,7 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
             assertTrue(first.isPresent());
             ExternalTransferData etd = first.get();
             assertEquals(expected.transferExternalId, etd.getTransferExternalId());
+
             assertEquals(expected.status, etd.getStatus());
             assertEquals(LocalDate.parse(expected.settlementDate), etd.getSettlementDate());
             assertEquals(LocalDate.parse(expected.effectiveFrom), etd.getEffectiveFrom());
@@ -1415,6 +1497,7 @@ public class InitiateExternalAssetOwnerTransferTest extends BaseLoanIntegrationT
         private final String effectiveTo;
         private final ExternalTransferData.SubStatusEnum subStatus;
         private final boolean detailsExpected;
+
         private final BigDecimal totalOutstanding;
         private final BigDecimal totalPrincipalOutstanding;
         private final BigDecimal totalInterestOutstanding;

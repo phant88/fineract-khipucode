@@ -19,6 +19,10 @@
 
 package org.apache.fineract.infrastructure.core.config;
 
+import java.io.Serial;
+import java.io.Serializable;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +52,8 @@ public class FineractProperties {
     private FineractModeProperties mode;
 
     private FineractCorrelationProperties correlation;
+
+    private FineractIpTrackingProperties ipTracking;
 
     private FineractPartitionedJob partitionedJob;
 
@@ -80,6 +86,10 @@ public class FineractProperties {
     private FineractModulesProperties module;
 
     private FineractSqlValidationProperties sqlValidation;
+
+    private FineractCache cache;
+
+    private RetryProperties retry;
 
     @Getter
     @Setter
@@ -146,6 +156,13 @@ public class FineractProperties {
 
         private boolean enabled;
         private String headerName;
+    }
+
+    @Getter
+    @Setter
+    public static class FineractIpTrackingProperties {
+
+        private boolean enabled;
     }
 
     @Getter
@@ -367,6 +384,9 @@ public class FineractProperties {
         private String bucketName;
         private String accessKey;
         private String secretKey;
+        private String region;
+        private String endpoint;
+        private Boolean pathStyleAddressingEnabled;
     }
 
     @Getter
@@ -397,6 +417,16 @@ public class FineractProperties {
 
         private int stuckRetryThreshold;
         private boolean loanCobEnabled;
+        private FineractJournalEntryAggregationProperties journalEntryAggregation;
+    }
+
+    @Getter
+    @Setter
+    public static class FineractJournalEntryAggregationProperties {
+
+        private Integer excludeRecentNDays;
+        private boolean enabled;
+        private Integer chunkSize;
     }
 
     @Getter
@@ -487,32 +517,63 @@ public class FineractProperties {
 
         private FineractSecurityBasicAuth basicauth;
         private FineractSecurityTwoFactorAuth twoFactor;
-        private FineractSecurityOAuth oauth;
+        private FineractSecurityHsts hsts;
+        private FineractSecurityOAuth2Properties oauth2;
 
         public void set2fa(FineractSecurityTwoFactorAuth twoFactor) {
             this.twoFactor = twoFactor;
         }
-    }
 
-    @Getter
-    @Setter
-    public static class FineractSecurityBasicAuth {
+        @Getter
+        @Setter
+        public static class FineractSecurityOAuth2Properties {
 
-        private boolean enabled;
-    }
+            private boolean enabled;
+            private ClientProperties client;
 
-    @Getter
-    @Setter
-    public static class FineractSecurityTwoFactorAuth {
+            @Getter
+            @Setter
+            public static class ClientProperties implements Serializable {
 
-        private boolean enabled;
-    }
+                @Serial
+                private static final long serialVersionUID = 1L;
+                private Map<String, Registration> registrations = new HashMap<>();
 
-    @Getter
-    @Setter
-    public static class FineractSecurityOAuth {
+                @Getter
+                @Setter
+                public static final class Registration implements Serializable {
 
-        private boolean enabled;
+                    @Serial
+                    private static final long serialVersionUID = 1L;
+                    private String clientId;
+                    private List<String> scopes = new ArrayList<>();
+                    private List<String> authorizationGrantTypes = new ArrayList<>();
+                    private List<String> redirectUris = new ArrayList<>();
+                    private boolean requireAuthorizationConsent = true;
+                }
+            }
+        }
+
+        @Getter
+        @Setter
+        public static class FineractSecurityBasicAuth {
+
+            private boolean enabled;
+        }
+
+        @Getter
+        @Setter
+        public static class FineractSecurityTwoFactorAuth {
+
+            private boolean enabled;
+        }
+
+        @Getter
+        @Setter
+        public static class FineractSecurityHsts {
+
+            private boolean enabled;
+        }
     }
 
     @Getter
@@ -537,11 +598,18 @@ public class FineractProperties {
     public static class FineractModulesProperties {
 
         private FineractInvestorModuleProperties investor;
+        private FineractSelfServiceModuleProperties selfService;
     }
 
     @Getter
     @Setter
     public static class FineractInvestorModuleProperties extends AbstractFineractModuleProperties {
+
+    }
+
+    @Getter
+    @Setter
+    public static class FineractSelfServiceModuleProperties extends AbstractFineractModuleProperties {
 
     }
 
@@ -577,5 +645,47 @@ public class FineractProperties {
 
         private String name;
         private String pattern;
+    }
+
+    @Getter
+    @Setter
+    public static class FineractCache {
+
+        private FineractCacheDetails defaultTemplate;
+        private Map<String, FineractCacheDetails> customTemplates = new HashMap<>();
+    }
+
+    @Getter
+    @Setter
+    public static class FineractCacheDetails {
+
+        private Duration ttl;
+        private Integer maximumEntries;
+    }
+
+    @Setter
+    @Getter
+    public static class RetryProperties {
+
+        private InstancesProperties instances;
+
+        @Setter
+        @Getter
+        public static class InstancesProperties {
+
+            private ExecuteCommandProperties executeCommand;
+
+            @Getter
+            @Setter
+            public static class ExecuteCommandProperties {
+
+                private Class<? extends Throwable>[] retryExceptions;
+                private Integer maxAttempts;
+                private Boolean enableExponentialBackoff;
+                private Double exponentialBackoffMultiplier;
+                private Duration waitDuration;
+
+            }
+        }
     }
 }

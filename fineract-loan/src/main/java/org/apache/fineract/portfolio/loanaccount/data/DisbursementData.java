@@ -30,9 +30,10 @@ import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanSchedul
  */
 @RequiredArgsConstructor
 @Getter
-public final class DisbursementData implements Comparable<DisbursementData> {
+public final class DisbursementData implements LoanPrincipalRelatedDataHolder, Comparable<DisbursementData> {
 
     private final Long id;
+    private final Long loanId;
     private final LocalDate expectedDisbursementDate;
     private final LocalDate actualDisbursementDate;
     private final BigDecimal principal;
@@ -61,6 +62,7 @@ public final class DisbursementData implements Comparable<DisbursementData> {
         this.note = "";
         this.linkAccountId = linkAccountId;
         this.id = null;
+        this.loanId = null;
         this.expectedDisbursementDate = null;
         this.principal = null;
         this.loanChargeId = null;
@@ -102,8 +104,7 @@ public final class DisbursementData implements Comparable<DisbursementData> {
 
     private boolean occursOnDayFromAndIncludingAndUpTo(final LocalDate fromInclusive, final LocalDate upToNotInclusive,
             final LocalDate target) {
-        return (DateUtils.isEqual(target, fromInclusive) || DateUtils.isAfter(target, fromInclusive))
-                && DateUtils.isBefore(target, upToNotInclusive);
+        return DateUtils.isDateInRangeFromInclusiveToExclusive(fromInclusive, upToNotInclusive, target);
     }
 
     public BigDecimal getWaivedChargeAmount() {

@@ -30,26 +30,31 @@ import org.apache.fineract.client.models.GetGlobalConfigurationsResponse;
 import org.apache.fineract.client.models.GlobalConfigurationPropertyData;
 import org.apache.fineract.client.models.PutGlobalConfigurationsRequest;
 import org.apache.fineract.client.models.PutGlobalConfigurationsResponse;
+import org.apache.fineract.client.util.Calls;
 import org.apache.fineract.client.util.JSON;
 import org.apache.fineract.infrastructure.configuration.api.GlobalConfigurationConstants;
-import org.apache.fineract.integrationtests.client.IntegrationTest;
 import org.junit.jupiter.api.Assertions;
 
 @SuppressWarnings({ "unused", "rawtypes" })
 @Slf4j
 @RequiredArgsConstructor
-public class GlobalConfigurationHelper extends IntegrationTest {
+public class GlobalConfigurationHelper {
 
     private static final Gson GSON = new JSON().getGson();
 
     public GetGlobalConfigurationsResponse getAllGlobalConfigurations() {
         log.info("------------------------ RETRIEVING ALL GLOBAL CONFIGURATIONS -------------------------");
-        return ok(fineract().globalConfigurations.retrieveConfiguration(false));
+        return Calls.ok(FineractClientHelper.getFineractClient().globalConfigurations.retrieveConfiguration(false));
     }
 
     public GlobalConfigurationPropertyData getGlobalConfigurationByName(final String configName) {
         log.info("------------------------ RETRIEVING GLOBAL CONFIGURATION BY NAME -------------------------");
-        return ok(fineract().globalConfigurations.retrieveOneByName(configName));
+        return Calls.ok(FineractClientHelper.getFineractClient().globalConfigurations.retrieveOneByName(configName));
+    }
+
+    public GlobalConfigurationPropertyData getGlobalConfigurationById(final Long configId) {
+        log.info("------------------------ RETRIEVING GLOBAL CONFIGURATION BY ID -------------------------");
+        return Calls.ok(FineractClientHelper.getFineractClient().globalConfigurations.retrieveOne3(configId));
     }
 
     // TODO: This is quite a bad pattern and adds a lot of time to individual test executions
@@ -100,8 +105,8 @@ public class GlobalConfigurationHelper extends IntegrationTest {
         ArrayList<HashMap> expectedGlobalConfigurations = getAllDefaultGlobalConfigurations();
         GetGlobalConfigurationsResponse actualGlobalConfigurations = getAllGlobalConfigurations();
 
-        Assertions.assertEquals(56, expectedGlobalConfigurations.size());
-        Assertions.assertEquals(56, actualGlobalConfigurations.getGlobalConfiguration().size());
+        Assertions.assertEquals(59, expectedGlobalConfigurations.size());
+        Assertions.assertEquals(59, actualGlobalConfigurations.getGlobalConfiguration().size());
 
         for (int i = 0; i < expectedGlobalConfigurations.size(); i++) {
 
@@ -535,17 +540,45 @@ public class GlobalConfigurationHelper extends IntegrationTest {
         enableImmediateChargeAccrualPostMaturity.put("trapDoor", false);
         defaults.add(enableImmediateChargeAccrualPostMaturity);
 
+        HashMap<String, Object> assetOwnerTransferInterestOutstandingStrategy = new HashMap<>();
+        assetOwnerTransferInterestOutstandingStrategy.put("name",
+                GlobalConfigurationConstants.ASSET_OWNER_TRANSFER_OUTSTANDING_INTEREST_CALCULATION_STRATEGY);
+        assetOwnerTransferInterestOutstandingStrategy.put("value", 0L);
+        assetOwnerTransferInterestOutstandingStrategy.put("enabled", true);
+        assetOwnerTransferInterestOutstandingStrategy.put("trapDoor", false);
+        assetOwnerTransferInterestOutstandingStrategy.put("string_value", "TOTAL_OUTSTANDING_INTEREST");
+        defaults.add(assetOwnerTransferInterestOutstandingStrategy);
+
+        HashMap<String, Object> allowedLoanStatusesForExternalAssetTransfer = new HashMap<>();
+        allowedLoanStatusesForExternalAssetTransfer.put("name",
+                GlobalConfigurationConstants.ALLOWED_LOAN_STATUSES_FOR_EXTERNAL_ASSET_TRANSFER);
+        allowedLoanStatusesForExternalAssetTransfer.put("value", 0L);
+        allowedLoanStatusesForExternalAssetTransfer.put("enabled", true);
+        allowedLoanStatusesForExternalAssetTransfer.put("trapDoor", false);
+        allowedLoanStatusesForExternalAssetTransfer.put("string_value", "ACTIVE,TRANSFER_IN_PROGRESS,TRANSFER_ON_HOLD");
+        defaults.add(allowedLoanStatusesForExternalAssetTransfer);
+
+        HashMap<String, Object> allowedLoanStatusesForDelayedSettlementExternalAssetTransfer = new HashMap<>();
+        allowedLoanStatusesForDelayedSettlementExternalAssetTransfer.put("name",
+                GlobalConfigurationConstants.ALLOWED_LOAN_STATUSES_OF_DELAYED_SETTLEMENT_FOR_EXTERNAL_ASSET_TRANSFER);
+        allowedLoanStatusesForDelayedSettlementExternalAssetTransfer.put("value", 0L);
+        allowedLoanStatusesForDelayedSettlementExternalAssetTransfer.put("enabled", true);
+        allowedLoanStatusesForDelayedSettlementExternalAssetTransfer.put("trapDoor", false);
+        allowedLoanStatusesForDelayedSettlementExternalAssetTransfer.put("string_value",
+                "ACTIVE,TRANSFER_IN_PROGRESS,TRANSFER_ON_HOLD,OVERPAID,CLOSED_OBLIGATIONS_MET");
+        defaults.add(allowedLoanStatusesForDelayedSettlementExternalAssetTransfer);
+
         return defaults;
     }
 
     public PutGlobalConfigurationsResponse updateGlobalConfiguration(final String configName, PutGlobalConfigurationsRequest request) {
         log.info("---------------------------------UPDATE VALUE FOR GLOBAL CONFIG---------------------------------------------");
-        return ok(fineract().globalConfigurations.updateConfigurationByName(configName, request));
+        return Calls.ok(FineractClientHelper.getFineractClient().globalConfigurations.updateConfigurationByName(configName, request));
     }
 
     public void updateGlobalConfigurationInternal(final String configName, final Long value) {
         log.info("---------------------------UPDATE VALUE FOR GLOBAL CONFIG (internal) ---------------------------------------");
-        ok(fineract().legacy.updateGlobalConfiguration(configName, value));
+        Calls.ok(FineractClientHelper.getFineractClient().legacy.updateGlobalConfiguration(configName, value));
     }
 
     public void manageConfigurations(final String configurationName, final boolean enabled) {

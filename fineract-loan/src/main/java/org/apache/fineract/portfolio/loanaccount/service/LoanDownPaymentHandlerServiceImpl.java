@@ -29,26 +29,22 @@ import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
-import org.apache.fineract.infrastructure.event.business.domain.loan.LoanBalanceChangedBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanTransactionDownPaymentPostBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.domain.loan.transaction.LoanTransactionDownPaymentPreBusinessEvent;
 import org.apache.fineract.infrastructure.event.business.service.BusinessEventNotifierService;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.loanaccount.data.HolidayDetailDTO;
 import org.apache.fineract.portfolio.loanaccount.data.ScheduleGeneratorDTO;
-import org.apache.fineract.portfolio.loanaccount.domain.ChangedTransactionDetail;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanEvent;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanLifecycleStateMachine;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepository;
-import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.LoanRepaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
 import org.apache.fineract.portfolio.loanaccount.exception.InvalidLoanStateTransitionException;
 import org.apache.fineract.portfolio.loanaccount.exception.InvalidLoanTransactionTypeException;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanDownPaymentTransactionValidator;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanRefundValidator;
 
@@ -62,6 +58,12 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
     private final LoanScheduleService loanScheduleService;
     private final LoanRefundService loanRefundService;
     private final LoanRefundValidator loanRefundValidator;
+    private final ReprocessLoanTransactionsService reprocessLoanTransactionsService;
+    private final LoanTransactionProcessingService loanTransactionProcessingService;
+    private final LoanLifecycleStateMachine loanLifecycleStateMachine;
+    private final LoanBalanceService loanBalanceService;
+    private final LoanTransactionService loanTransactionService;
+    private final LoanJournalEntryPoster journalEntryPoster;
 
     @Override
     public LoanTransaction handleDownPayment(ScheduleGeneratorDTO scheduleGeneratorDTO, JsonCommand command,
@@ -70,18 +72,15 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
         LoanTransaction downPaymentTransaction = handleDownPayment(loan, disbursementTransaction, command, scheduleGeneratorDTO);
         if (downPaymentTransaction != null) {
             downPaymentTransaction = loanTransactionRepository.saveAndFlush(downPaymentTransaction);
+            journalEntryPoster.postJournalEntriesForLoanTransaction(downPaymentTransaction, false, false);
             businessEventNotifierService.notifyPostBusinessEvent(new LoanTransactionDownPaymentPostBusinessEvent(downPaymentTransaction));
-            businessEventNotifierService.notifyPostBusinessEvent(new LoanBalanceChangedBusinessEvent(loan));
         }
         return downPaymentTransaction;
     }
 
     @Override
-    public ChangedTransactionDetail handleRepaymentOrRecoveryOrWaiverTransaction(final Loan loan, final LoanTransaction loanTransaction,
-            final LoanLifecycleStateMachine loanLifecycleStateMachine, final LoanTransaction adjustedTransaction,
-            final ScheduleGeneratorDTO scheduleGeneratorDTO) {
-        ChangedTransactionDetail changedTransactionDetail = null;
-
+    public void handleRepaymentOrRecoveryOrWaiverTransaction(final Loan loan, final LoanTransaction loanTransaction,
+            final LoanTransaction adjustedTransaction, final ScheduleGeneratorDTO scheduleGeneratorDTO) {
         if (loanTransaction.isRecoveryRepayment()) {
             loanLifecycleStateMachine.transition(LoanEvent.LOAN_RECOVERY_PAYMENT, loan);
         }
@@ -94,7 +93,8 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
 
         loanTransaction.updateLoan(loan);
 
-        final boolean isTransactionChronologicallyLatest = loan.isChronologicallyLatestRepaymentOrWaiver(loanTransaction);
+        final boolean isTransactionChronologicallyLatest = loanTransactionService.isChronologicallyLatestRepaymentOrWaiver(loan,
+                loanTransaction);
 
         if (loanTransaction.isNotZero()) {
             loan.addLoanTransaction(loanTransaction);
@@ -127,62 +127,63 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
 
         loanRefundValidator.validateTransactionAmountThreshold(loan, adjustedTransaction);
 
-        final LoanRepaymentScheduleTransactionProcessor loanRepaymentScheduleTransactionProcessor = loan.getTransactionProcessor();
-
         final LoanRepaymentScheduleInstallment currentInstallment = loan
                 .fetchLoanRepaymentScheduleInstallmentByDueDate(loanTransaction.getTransactionDate());
 
-        boolean reprocess = loan.isForeclosure() || !isTransactionChronologicallyLatest || adjustedTransaction != null
-                || !DateUtils.isEqualBusinessDate(loanTransaction.getTransactionDate()) || currentInstallment == null
-                || !currentInstallment.getTotalOutstanding(loan.getCurrency()).isEqualTo(loanTransaction.getAmount(loan.getCurrency()));
+        boolean reprocessOnPostConditions = false;
 
-        if (isTransactionChronologicallyLatest && adjustedTransaction == null
-                && (!reprocess || !loan.repaymentScheduleDetail().isInterestRecalculationEnabled()) && !loan.isForeclosure()) {
-            loanRepaymentScheduleTransactionProcessor.processLatestTransaction(loanTransaction,
+        boolean processLatest = isTransactionChronologicallyLatest //
+                && adjustedTransaction == null // covers reversals
+                && !loan.isForeclosure() //
+                && !loan.hasChargesAffectedByBackdatedRepaymentLikeTransaction(loanTransaction)
+                && loanTransactionProcessingService.canProcessLatestTransactionOnly(loan, loanTransaction, currentInstallment); //
+        if (processLatest) {
+            loanTransactionProcessingService.processLatestTransaction(loan.getTransactionProcessingStrategyCode(), loanTransaction,
                     new TransactionCtx(loan.getCurrency(), loan.getRepaymentScheduleInstallments(), loan.getActiveCharges(),
                             new MoneyHolder(loan.getTotalOverpaidAsMoney()), null));
-            reprocess = false;
-            if (loan.repaymentScheduleDetail().isInterestRecalculationEnabled()) {
+            if (!loan.isProgressiveSchedule() && loan.isInterestBearingAndInterestRecalculationEnabled()) {
                 if (currentInstallment == null || currentInstallment.isNotFullyPaidOff()) {
-                    reprocess = true;
+                    reprocessOnPostConditions = true;
                 } else {
                     final LoanRepaymentScheduleInstallment nextInstallment = loan
                             .fetchRepaymentScheduleInstallment(currentInstallment.getInstallmentNumber() + 1);
                     if (nextInstallment != null && nextInstallment.getTotalPaidInAdvance(loan.getCurrency()).isGreaterThanZero()) {
-                        reprocess = true;
+                        reprocessOnPostConditions = true;
                     }
                 }
             }
         }
-        if (reprocess) {
-            if (loan.repaymentScheduleDetail().isInterestRecalculationEnabled()
-                    && !loan.getLoanProductRelatedDetail().getLoanScheduleType().equals(LoanScheduleType.PROGRESSIVE)) {
+        if (!processLatest || reprocessOnPostConditions) {
+            if (loan.isCumulativeSchedule() && loan.isInterestBearingAndInterestRecalculationEnabled()) {
                 loanScheduleService.regenerateRepaymentScheduleWithInterestRecalculation(loan, scheduleGeneratorDTO);
+            } else if (loan.isProgressiveSchedule() && ((loan.hasChargeOffTransaction() && loan.hasAccelerateChargeOffStrategy())
+                    || loan.hasContractTerminationTransaction()
+                    || (loan.isInterestRecalculationEnabled() && loan.hasReAgingTransaction()))) {
+                loanScheduleService.regenerateRepaymentSchedule(loan, scheduleGeneratorDTO);
             }
-            changedTransactionDetail = loan.reprocessTransactions();
+            reprocessLoanTransactionsService.reprocessTransactions(loan);
         }
-
-        loan.updateLoanSummaryDerivedFields();
 
         /**
          * FIXME: Vishwas, skipping post loan transaction checks for Loan recoveries
          **/
         if (loanTransaction.isNotRecoveryRepayment()) {
-            loan.doPostLoanTransactionChecks(loanTransaction.getTransactionDate(), loanLifecycleStateMachine);
+            loanLifecycleStateMachine.determineAndTransition(loan, loanTransaction.getTransactionDate());
+        } else {
+            loanBalanceService.updateLoanSummaryDerivedFields(loan);
         }
 
         if (loan.getLoanProduct().isMultiDisburseLoan()) {
             final BigDecimal totalDisbursed = loan.getDisbursedAmount();
             final BigDecimal totalPrincipalAdjusted = loan.getSummary().getTotalPrincipalAdjustments();
-            final BigDecimal totalPrincipalCredited = totalDisbursed.add(totalPrincipalAdjusted);
+            final BigDecimal totalCapitalizedIncome = loan.getSummary().getTotalCapitalizedIncome();
+            final BigDecimal totalPrincipalCredited = totalDisbursed.add(totalPrincipalAdjusted).add(totalCapitalizedIncome);
             if (totalPrincipalCredited.compareTo(loan.getSummary().getTotalPrincipalRepaid()) < 0
-                    && loan.repaymentScheduleDetail().getPrincipal().minus(totalDisbursed).isGreaterThanZero()) {
+                    && loan.getLoanProductRelatedDetail().getPrincipal().minus(totalDisbursed).isGreaterThanZero()) {
                 final String errorMessage = "The transaction amount cannot exceed threshold.";
                 throw new InvalidLoanStateTransitionException("transaction", "amount.exceeds.threshold", errorMessage);
             }
         }
-
-        return changedTransactionDetail;
     }
 
     private LoanTransaction handleDownPayment(final Loan loan, final LoanTransaction disbursementTransaction, final JsonCommand command,
@@ -196,8 +197,9 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
         }
         Money downPaymentMoney = Money.of(loan.getCurrency(),
                 MathUtil.percentageOf(disbursementTransaction.getAmount(), disbursedAmountPercentageForDownPayment, 19));
-        if (loan.getLoanProduct().getInstallmentAmountInMultiplesOf() != null) {
-            downPaymentMoney = Money.roundToMultiplesOf(downPaymentMoney, loan.getLoanProduct().getInstallmentAmountInMultiplesOf());
+        if (loan.getLoanProductRelatedDetail().getInstallmentAmountInMultiplesOf() != null) {
+            downPaymentMoney = Money.roundToMultiplesOf(downPaymentMoney,
+                    loan.getLoanProductRelatedDetail().getInstallmentAmountInMultiplesOf());
         }
         final Money adjustedDownPaymentMoney = switch (loan.getLoanProductRelatedDetail().getLoanScheduleType()) {
             // For Cumulative loan: To check whether the loan was overpaid when the disbursement happened and to get the
@@ -229,8 +231,7 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
             loanDownPaymentTransactionValidator.validateRepaymentDateIsOnNonWorkingDay(downPaymentTransaction.getTransactionDate(),
                     holidayDetailDTO.getWorkingDays(), holidayDetailDTO.isAllowTransactionsOnNonWorkingDay());
 
-            handleRepaymentOrRecoveryOrWaiverTransaction(loan, downPaymentTransaction, loan.getLoanLifecycleStateMachine(), null,
-                    scheduleGeneratorDTO);
+            handleRepaymentOrRecoveryOrWaiverTransaction(loan, downPaymentTransaction, null, scheduleGeneratorDTO);
             return downPaymentTransaction;
         } else {
             return null;

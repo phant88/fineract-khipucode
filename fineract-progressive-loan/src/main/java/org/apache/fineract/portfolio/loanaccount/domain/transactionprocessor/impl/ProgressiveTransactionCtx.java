@@ -18,7 +18,6 @@
  */
 package org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.impl;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -32,25 +31,36 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleIns
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.MoneyHolder;
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.TransactionCtx;
-import org.apache.fineract.portfolio.loanaccount.loanschedule.data.ProgressiveLoanInterestScheduleModel;
+import org.apache.fineract.portfolio.loanproduct.calc.data.ProgressiveLoanInterestScheduleModel;
 
 @Getter
 public class ProgressiveTransactionCtx extends TransactionCtx {
 
     private final ProgressiveLoanInterestScheduleModel model;
-    @Setter
-    private LocalDate lastOverdueBalanceChange = null;
-    private List<LoanTransaction> alreadyProcessedTransactions = new ArrayList<>();
+    private final List<LoanTransaction> alreadyProcessedTransactions = new ArrayList<>();
     @Setter
     private Money sumOfInterestRefundAmount;
     @Setter
     private boolean isChargedOff = false;
+    @Setter
+    private boolean isWrittenOff = false;
+    @Setter
+    private boolean isContractTerminated = false;
+    @Setter
+    private boolean isPrepayAttempt = false;
+    private final List<LoanRepaymentScheduleInstallment> skipRepaymentScheduleInstallments = new ArrayList<>();
 
     public ProgressiveTransactionCtx(MonetaryCurrency currency, List<LoanRepaymentScheduleInstallment> installments,
             Set<LoanCharge> charges, MoneyHolder overpaymentHolder, ChangedTransactionDetail changedTransactionDetail,
             ProgressiveLoanInterestScheduleModel model) {
+        this(currency, installments, charges, overpaymentHolder, changedTransactionDetail, model, Money.zero(currency));
+    }
+
+    public ProgressiveTransactionCtx(MonetaryCurrency currency, List<LoanRepaymentScheduleInstallment> installments,
+            Set<LoanCharge> charges, MoneyHolder overpaymentHolder, ChangedTransactionDetail changedTransactionDetail,
+            ProgressiveLoanInterestScheduleModel model, Money sumOfInterestRefundAmount) {
         super(currency, installments, charges, overpaymentHolder, changedTransactionDetail);
-        sumOfInterestRefundAmount = model.zero();
+        this.sumOfInterestRefundAmount = sumOfInterestRefundAmount;
         this.model = model;
     }
 }

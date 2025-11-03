@@ -39,28 +39,31 @@ dependencies {
     testImplementation 'org.springframework:spring-jms'
 
     testImplementation 'com.squareup.retrofit2:retrofit:2.11.0'
-    testImplementation 'commons-httpclient:commons-httpclient:3.1'
-    testImplementation 'org.apache.commons:commons-lang3:3.17.0'
-    testImplementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    testImplementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    testImplementation 'org.apache.commons:commons-lang3:3.18.0'
+    testImplementation ('com.googlecode.json-simple:json-simple:1.1.1') {
+        exclude group: 'junit', module: 'junit'
+    }
     testImplementation 'com.google.code.gson:gson:2.11.0'
 
+    testImplementation 'org.junit.platform:junit-platform-suite:1.11.4'
+    testImplementation 'org.junit.platform:junit-platform-console:1.11.4'
     testImplementation 'io.cucumber:cucumber-java:7.20.1'
     testImplementation 'io.cucumber:cucumber-junit:7.20.1'
     testImplementation 'io.cucumber:cucumber-spring:7.20.1'
+    testImplementation 'io.cucumber:cucumber-junit-platform-engine:7.20.1'
 
-    testImplementation 'io.qameta.allure:allure-cucumber7-jvm:2.29.0'
+    testImplementation 'io.qameta.allure:allure-cucumber7-jvm:2.29.1'
 
     testImplementation 'org.assertj:assertj-core:3.26.3'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.3'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
 
     testCompileOnly 'org.projectlombok:lombok:1.18.36'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.36'
 
-    testImplementation "ch.qos.logback:logback-core:1.5.12"
-    testImplementation "ch.qos.logback:logback-classic:1.5.12"
+    testImplementation "ch.qos.logback:logback-core:1.5.17"
+    testImplementation "ch.qos.logback:logback-classic:1.5.17"
 
-    testImplementation 'org.apache.activemq:activemq-client:6.1.4'
+    testImplementation 'org.apache.activemq:activemq-client:6.1.6'
     testImplementation "org.apache.avro:avro:1.12.0"
     testImplementation "org.awaitility:awaitility:4.2.2"
     testImplementation 'io.github.classgraph:classgraph:4.8.179'
@@ -70,6 +73,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty("cucumber.junit-platform.naming-strategy", "long")
 }
 
 tasks.named('cucumber').get().finalizedBy 'allureReport'
@@ -77,15 +81,29 @@ tasks.named('cucumber').get().finalizedBy 'allureReport'
 tasks.named('cucumber').get().dependsOn 'spotlessCheck'
 
 cucumber {
-    tags = 'not @ignore'
-    main = 'io.cucumber.core.cli.Main'
-    shorten = 'argfile'
-    plugin = [
-        'pretty',
-        'io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm'
-    ]
+    // Use -Pcucumber.features=... if passed, otherwise default
+    if (project.hasProperty("cucumber.features")) {
+        featurePath = project.getProperty("cucumber.features")
+    } else {
+        featurePath = "src/test/resources/features";
+    }
+
+    tags = 'not @Skip'
+    if (project.hasProperty("cucumber.tags")) {
+        tags = [project.getProperty("cucumber.tags")]
+    }
+
+    if (project.hasProperty("cucumber.name")) {
+        name = project.getProperty("cucumber.name")
+    }
+
+    plugin = ['pretty', 'io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm']
 }
 
 allure {
     version = '2.17.3'
+}
+
+test {
+    useJUnitPlatform()
 }

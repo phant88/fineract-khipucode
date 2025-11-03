@@ -18,12 +18,12 @@
  */
 package org.apache.fineract.infrastructure.core.service;
 
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.organisation.monetary.domain.MoneyHelper;
+import org.springframework.lang.NonNull;
 
 public final class MathUtil {
 
@@ -39,8 +39,8 @@ public final class MathUtil {
         return nullToDefault(value, 0L);
     }
 
-    public static Long nullToDefault(Long value, Long def) {
-        return value == null ? def : value;
+    public static Integer nullToZero(Integer value) {
+        return nullToDefault(value, 0);
     }
 
     public static Long zeroToNull(Long value) {
@@ -217,6 +217,10 @@ public final class MathUtil {
         return nullToZero(first).compareTo(nullToZero(second)) < 0;
     }
 
+    public static boolean isLessThanOrEqualTo(BigDecimal first, BigDecimal second) {
+        return nullToZero(first).compareTo(second) <= 0;
+    }
+
     public static boolean isGreaterThanOrEqualTo(BigDecimal first, BigDecimal second) {
         return nullToZero(first).compareTo(nullToZero(second)) >= 0;
     }
@@ -265,9 +269,13 @@ public final class MathUtil {
 
     /** @return sum the values considering null values */
     public static BigDecimal add(BigDecimal... amounts) {
+        return add(MoneyHelper.getMathContext(), amounts);
+    }
+
+    public static BigDecimal add(MathContext mc, BigDecimal... amounts) {
         BigDecimal result = null;
         for (BigDecimal amount : amounts) {
-            result = add(result, amount, MoneyHelper.getMathContext());
+            result = add(result, amount, mc);
         }
         return result;
     }
@@ -295,7 +303,7 @@ public final class MathUtil {
     /**
      * @return BigDecimal with scale set to the 'digitsAfterDecimal' of the parameter currency
      */
-    public static BigDecimal normalizeAmount(BigDecimal amount, @NotNull MonetaryCurrency currency) {
+    public static BigDecimal normalizeAmount(BigDecimal amount, @NonNull MonetaryCurrency currency) {
         return amount == null ? null : amount.setScale(currency.getDigitsAfterDecimal(), MoneyHelper.getRoundingMode());
     }
 
@@ -313,7 +321,7 @@ public final class MathUtil {
         return amount == null ? null : amount.toPlainString();
     }
 
-    public static Money toMoney(BigDecimal amount, @NotNull MonetaryCurrency currency) {
+    public static Money toMoney(BigDecimal amount, @NonNull MonetaryCurrency currency) {
         return amount == null ? null : Money.of(currency, amount);
     }
 
@@ -323,8 +331,12 @@ public final class MathUtil {
         return value == null ? null : value.getAmount();
     }
 
-    public static Money nullToZero(Money value, @NotNull MonetaryCurrency currency) {
+    public static Money nullToZero(Money value, @NonNull MonetaryCurrency currency) {
         return nullToDefault(value, Money.zero(currency));
+    }
+
+    public static Money nullToZero(Money value, @NonNull MonetaryCurrency currency, @NonNull MathContext mc) {
+        return nullToDefault(value, Money.zero(currency, mc));
     }
 
     public static Money nullToDefault(Money value, Money def) {
@@ -496,5 +508,9 @@ public final class MathUtil {
     public static Money max(Money first, Money second, boolean notNull) {
         return notNull ? first == null ? second : second == null ? first : max(first, second, false)
                 : isGreaterThan(first, second) ? first : second;
+    }
+
+    public static boolean isEqualTo(Integer first, Integer second) {
+        return nullToZero(first).equals(nullToZero(second));
     }
 }
